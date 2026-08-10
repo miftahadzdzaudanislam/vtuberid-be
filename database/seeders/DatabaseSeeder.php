@@ -20,7 +20,11 @@ class DatabaseSeeder extends Seeder
             OrganizationSeeder::class,
             PlatformSeeder::class,
             TagSeeder::class,
-            VtuberSeeder::class
+            VtuberSeeder::class,
+
+            OrganizationMemberSeeder::class,
+            SocialAccountSeeder::class,
+            VtuberTagSeeder::class,
         ]);
     }
 }

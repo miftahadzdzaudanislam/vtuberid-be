@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('platform_id')->constrained('platforms')->onDelete('cascade');
             $table->string('username');
             $table->string('url');
+            $table->unsignedInteger('followers')->default(0);
             $table->timestamps();
         });
     }

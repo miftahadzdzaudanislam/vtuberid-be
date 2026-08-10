@@ -54,19 +54,14 @@ class VtuberSeeder extends Seeder
         ];
 
         $genders      = ['male', 'female'];
-        $affiliations = ['independent', 'organization'];
-
-        $statuses = array_merge(
-            array_fill(0, 10, 'active'),
-            array_fill(0, 3, 'hiatus'),
-            array_fill(0, 3, 'graduated'),
-            array_fill(0, 2, 'inactive'),
-            array_fill(0, 1, 'retired'),
-            array_fill(0, 1, 'unknown'),
+        $affiliations = array_merge(
+            array_fill(0, 3, 'organization'),
+            array_fill(0, 1, 'independent'),
         );
+        $statuses = ['active', 'inactive', 'hiatus', 'graduated', 'retired', 'unknown'];
 
         $names = [];
-        while (count($names) < 5) {
+        while (count($names) < 10) {
             $name = $faker->randomElement($firstNames) . ' ' . $faker->randomElement($lastNames);
             $names[$name] = true;
         }

@@ -38,7 +38,7 @@ class Vtuber extends Model
             'joined_at',
             'left_at',
             'status'
-        ]);
+        ])->wherePivot('status', 'active');
     }
 
     public function socialAccounts()
