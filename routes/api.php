@@ -10,7 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // ========================= AUTH ===============================
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->name('login');
+Route::post('/refresh', [AuthController::class, 'refresh']);
 
 // ========================= PUBLIC ROUTES ===============================
 Route::get('/vtubers', [VtuberController::class, 'daftarVtuber']);
@@ -20,7 +21,6 @@ Route::get('/tags', [TagController::class, 'daftarTag']);
 // ========================= AUTH ROUTES ===============================
 Route::middleware('auth:api')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
-    Route::post('/refresh', [AuthController::class, 'refresh']);
     Route::post('/me', [AuthController::class, 'me']);
 
     // ========================= ADMIN ROUTES ===============================

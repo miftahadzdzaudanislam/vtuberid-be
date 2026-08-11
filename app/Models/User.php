@@ -44,4 +44,21 @@ class User extends Authenticatable implements JWTSubject
     {
         return [];
     }
+
+    // Scopes
+    public function scopeByRole($query, $role)
+    {
+        return $query->where('role', $role);
+    }
+
+    // Helper Methods
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isEditor(): bool
+    {
+        return $this->role === 'editor';
+    }
 }

@@ -20,11 +20,12 @@ class OrganizationSeeder extends Seeder
 
         $types = ['agency', 'group'];
         $statuses = ['active', 'inactive', 'liquidated'];
-        $suffixes = ['Studio', 'Entertainment', 'Collective', 'Productions', 'Media'];
+        $firstName = ['Cozy', 'Live', 'Dream', 'Virtual', 'Creative'];
+        $lastName = ['Studio', 'Entertainment', 'Collective', 'Productions', 'Media'];
         $slugs = [];
 
         for ($i=0; $i < 3; $i++) { 
-            $name = $faker->unique()->company().' '.$faker->randomElement($suffixes);
+            $name = $faker->randomElement($firstName).' '.$faker->randomElement($lastName);
             $slug = Str::slug($name);
 
             if (in_array($slug, $slugs)) {

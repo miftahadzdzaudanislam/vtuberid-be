@@ -17,6 +17,12 @@ class OrganizationController extends Controller
         $limit = $request->input('limit', 50);
 
         $organizations = QueryBuilder::for(Organization::class)
+            ->select([
+                'id',
+                'name',
+                'slug',
+                'logo',
+            ])
             ->allowedFilters(
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where('name', 'like', "%$value%");
@@ -24,14 +30,64 @@ class OrganizationController extends Controller
                 }),
                 AllowedFilter::exact('status'),
                 AllowedFilter::exact('type'),
-            )->withCount([
+            )->with([
+                'vtubers:id,avatar'
+            ])->withCount([
                 'vtubers as talent_count' => function ($query) {
                     $query->where('organization_members.status', 'active');
                 }
             ])->orderBy('name', 'asc')
             ->paginate($limit)
             ->appends($request->query());
-        
+
+        if ($organizations->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+                'message' => 'Tidak ada data Organisasi ditemukan!'
+            ], 200);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Get all organizations',
+            'data' => $organizations->items(),
+            'paggination' => [
+                'total' => $organizations->total(),
+                'per_page' => $organizations->perPage(),
+                'current_page' => $organizations->currentPage(),
+                'last_page' => $organizations->lastPage(),
+                'from' => $organizations->firstItem(),
+                'to' => $organizations->lastItem()
+            ]
+        ], 200);
+    }
+
+    /**
+     * Menampilkan data organisasi untuk admin
+     */
+    public function index(Request $request)
+    {
+        $limit = $request->input('limit', 50);
+
+        $organizations = QueryBuilder::for(Organization::class)
+            ->allowedFilters(
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where('name', 'like', "%$value%");
+                    $query->where('slug', 'like', "%$value%");
+                }),
+                AllowedFilter::exact('status'),
+                AllowedFilter::exact('type'),
+            )->with([
+                'vtubers:id,avatar',
+            ])->withCount([
+                'vtubers as talent_count' => function ($query) {
+                    $query->where('organization_members.status', 'active');
+                }
+            ])->orderBy('name', 'asc')
+            ->paginate($limit)
+            ->appends($request->query());
+
         if ($organizations->isEmpty()) {
             return response()->json([
                 'success' => true,
@@ -53,14 +109,6 @@ class OrganizationController extends Controller
                 'to' => $organizations->lastItem()
             ]
         ], 200);
-    }
-
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
-    {
-        //
     }
 
     /**

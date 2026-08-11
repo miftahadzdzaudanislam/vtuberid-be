@@ -55,7 +55,7 @@ class VtuberSeeder extends Seeder
 
         $genders      = ['male', 'female'];
         $affiliations = array_merge(
-            array_fill(0, 3, 'organization'),
+            array_fill(0, 4, 'organization'),
             array_fill(0, 1, 'independent'),
         );
         $statuses = ['active', 'inactive', 'hiatus', 'graduated', 'retired', 'unknown'];
