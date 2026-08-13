@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Vtuber;
 
+use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\Vtuber;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -15,6 +16,8 @@ class VtuberController extends Controller
 {
     /**
      * Menampilkan daftar vtuber
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function daftarVtuber(Request $request)
     {
@@ -27,6 +30,7 @@ class VtuberController extends Controller
                 'slug',
                 'avatar',
                 'status',
+                'current_affiliation'
             ])
             ->allowedFilters(
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -55,6 +59,11 @@ class VtuberController extends Controller
             ], 200);
         }
 
+        // Hilangkan pivot dari data organisasi
+        $vtubers->getCollection()->each(function ($vtuber) {
+            $vtuber->organizations->each->makeHidden('pivot');
+        });
+
         return response()->json([
             'success' => true,
             'message' => 'Get all vtubers',
@@ -71,7 +80,36 @@ class VtuberController extends Controller
     }
 
     /**
+     * Menampilkan detail vtuber berdasarkan slug
+     * @param string $slug
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function detailVtuber(string $slug)
+    {
+        $vtuber = Vtuber::with([
+            'organizations:id,name,slug,type,logo',
+            'tags:id,name,slug',
+            'socialAccounts:id,vtuber_id,platform_id,username,url,followers'
+        ])->where('slug', $slug)->first();
+
+        if (!$vtuber) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vtuber not found'
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Get vtuber details',
+            'data' => $vtuber,
+        ], 200);
+    }
+
+    /**
      * Menampilkan data vtuber untuk admin
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function index(Request $request)
     {
@@ -141,6 +179,8 @@ class VtuberController extends Controller
 
     /**
      * Create a new vtuber
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function store(Request $request)
     {
@@ -152,16 +192,10 @@ class VtuberController extends Controller
             'gender' => 'required|in:male,female',
             'debut_date' => 'nullable|date',
             'birthday' => 'nullable|date_format:m-d',
+            'height' => 'nullable|integer|min:1|max:300',
             'status' => 'required|in:active,inactive,hiatus,graduated,retired,unknown',
             'avatar' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
             'banner' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
-
-            'organizations' => 'nullable|array',
-            'organizations.*.organization_id' => 'required|exists:organizations,id',
-            'organizations.*.generation' => 'nullable|string|max:100',
-            'organizations.*.joined_at' => 'nullable|date',
-            'organizations.*.left_at' => 'nullable|date',
-            'organizations.*.status' => 'required|in:active,graduated,left',
 
             'tag_ids' => 'nullable|string',
 
@@ -169,6 +203,7 @@ class VtuberController extends Controller
             'platforms.*.platform_id' => 'required|integer|exists:platforms,id',
             'platforms.*.username' => 'required|string|max:255',
             'platforms.*.url' => 'required|url|max:500',
+            'platforms.*.followers' => 'required|numeric'
         ]);
 
         // Check Validator errors
@@ -180,14 +215,10 @@ class VtuberController extends Controller
         }
 
         // Get data
-        $organizations = $request->input('organizations', []);
         $tagIds = $request->input('tag_ids', []);
         $platforms = $request->input('platforms', []);
 
         // Convert string to array
-        if (is_string($organizations)) {
-            $organizations = json_decode($organizations, true) ?? [];
-        }
         if (is_string($tagIds)) {
             $tagIds = array_filter(
                 array_map('intval', explode(',', $tagIds))
@@ -197,16 +228,10 @@ class VtuberController extends Controller
             $platforms = json_decode($platforms, true) ?? [];
         }
 
-        // Set Current affiliation
-        $currentAffiliation = collect($organizations)->contains(
-            fn($organization) => isset($organization['status'])
-                && $organization['status'] === 'active'
-        ) ? 'organization' : 'independent';
-
         $avatarPath = null;
         $bannerPath = null;
 
-        // Upload avatar & banner
+        // Upload image avatar & banner
         if ($request->hasFile('avatar')) {
             $avatar = $request->file('avatar');
             $ext = $avatar->getClientOriginalExtension();
@@ -229,24 +254,12 @@ class VtuberController extends Controller
             'gender' => $request->gender,
             'debut_date' => $request->debut_date,
             'birthday' => $request->birthday,
+            'height' => $request->height,
             'status' => $request->status,
-            'current_affiliation' => $currentAffiliation,
+            'current_affiliation' => 'independent',
             'avatar' => $avatarPath,
             'banner' => $bannerPath,
         ]);
-
-        // Insert Organizations
-        foreach ($organizations as $organization) {
-            $vtuber->organizations()->attach(
-                $organization['organization_id'],
-                [
-                    'generation' => $organization['generation'] ?? null,
-                    'joined_at' => $organization['joined_at'] ?? null,
-                    'left_at' => $organization['left_at'] ?? null,
-                    'status' => $organization['status'],
-                ]
-            );
-        }
 
         // Insert Tags
         if (!empty($tagIds)) {
@@ -259,7 +272,164 @@ class VtuberController extends Controller
                 'platform_id' => $account['platform_id'],
                 'username' => $account['username'],
                 'url' => $account['url'],
+                'followers' => $account['followers']
             ]);
+        }
+
+        // Return respons json
+        return response()->json([
+            'success' => true,
+            'message' => 'Vtuber created successfully!',
+            'data' => $vtuber->load([
+                'tags:id,name,slug',
+                'socialAccounts:id,vtuber_id,platform_id,username,url,followers'
+            ])
+        ], 201);
+    }
+
+    /**
+     * Menampilkan detail vtuber berdasarkan ID
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function show(string $id)
+    {
+        $vtuber = Vtuber::with([
+            'organizations:id,name,slug,type,logo',
+            'tags:id,name,slug',
+            'socialAccounts:id,vtuber_id,platform_id,username,url'
+        ])->find($id);
+
+        if (!$vtuber) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vtuber not found'
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Get vtuber details',
+            'data' => $vtuber,
+        ], 200);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, string $id)
+    {
+        // Find vtuber
+        $vtuber = Vtuber::find($id);
+        if (!$vtuber) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vtuber not found',
+            ], 404);
+        }
+
+        // Validator
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255|unique:vtubers,slug,' . $id,
+            'description' => 'nullable|string',
+            'gender' => 'required|in:male,female',
+            'debut_date' => 'nullable|date',
+            'birthday' => 'nullable|date_format:m-d',
+            'height' => 'nullable|integer|min:1|max:300',
+            'status' => 'required|in:active,inactive,hiatus,graduated,retired,unknown',
+            'avatar' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'banner' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+
+            'tag_ids' => 'nullable|string',
+
+            'platforms' => 'nullable|array',
+            'platforms.*.id' => 'nullable|integer|exists:social_accounts,id',
+            'platforms.*.platform_id' => 'required|integer|exists:platforms,id',
+            'platforms.*.username' => 'required|string|max:255',
+            'platforms.*.url' => 'required|url|max:500',
+            'platforms.*.followers' => 'required|numeric'
+        ]);
+
+        // Check Validator errors
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors(),
+            ], 422);
+        }
+
+        // Get data
+        $tagIds = $request->input('tag_ids', []);
+        $platforms = $request->input('platforms', []);
+
+        // Convert string to array
+        if (is_string($tagIds)) {
+            $tagIds = array_filter(
+                array_map('intval', explode(',', $tagIds))
+            );
+        }
+        if (is_string($platforms)) {
+            $platforms = json_decode($platforms, true) ?? [];
+        }
+
+        // siapkan data yang ingin di update
+        $data = [
+            'name' => $request->name,
+            'slug' => $request->slug ?? Str::slug($request->name),
+            'description' => $request->description,
+            'gender' => $request->gender,
+            'debut_date' => $request->debut_date,
+            'birthday' => $request->birthday,
+            'height' => $request->height,
+            'status' => $request->status,
+        ];
+
+        // handle image avatar & banner
+        if ($request->hasFile('avatar')) {
+            $avatar = $request->file('avatar');
+            $ext = $avatar->getClientOriginalExtension();
+            $filename = Str::slug($request->name) . '_' . time() . '.' . $ext;
+            $avatar->storeAs('vtubers/avatar', $filename, 'public');
+
+            if ($vtuber->avatar) {
+                Storage::disk('public')->delete('vtubers/avatar/' . $vtuber->avatar);
+            }
+            $data['avatar'] = $filename;
+        }
+
+        if ($request->hasFile('banner')) {
+            $banner = $request->file('banner');
+            $ext = $banner->getClientOriginalExtension();
+            $filename = Str::slug($request->name) . '_' . time() . '.' . $ext;
+            $banner->storeAs('vtubers/banner', $filename, 'public');
+
+            if ($vtuber->banner) {
+                Storage::disk('public')->delete('vtubers/banner/' . $vtuber->banner);
+            }
+            $data['banner'] = $filename;
+        }
+
+        // Update vtuber
+        $vtuber->update($data);
+
+        // Update Tags
+        if ($request->has('tag_ids')) {
+            $vtuber->tags()->syncWithoutDetaching($tagIds);
+        }
+
+        // Update Social Accounts
+        if ($request->has('platforms')) {
+            $vtuber->socialAccounts()->delete();
+
+            foreach ($platforms as $account) {
+                $vtuber->socialAccounts()->create([
+                    'platform_id' => $account['platform_id'],
+                    'username' => $account['username'],
+                    'url' => $account['url'],
+                    'followers' => $account['followers'],
+                ]);
+            }
         }
 
         // dd($request->all());
@@ -267,36 +437,40 @@ class VtuberController extends Controller
         // Return respons json
         return response()->json([
             'success' => true,
-            'message' => 'Vtuber created successfully!',
+            'message' => 'Vtuber updated successfully!',
             'data' => $vtuber->load([
-                'organizations:id,name,slug,logo',
                 'tags:id,name,slug',
-                'socialAccounts:id,vtuber_id,platform_id,username,url'
+                'socialAccounts:id,vtuber_id,platform_id,username,url,followers'
             ])
-        ], 201);
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(Vtuber $vtuber)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Vtuber $vtuber)
-    {
-        //
+        ], 200);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Vtuber $vtuber)
+    public function destroy(string $id)
     {
-        //
+        // Find vtuber
+        $vtuber = Vtuber::find($id);
+        if (!$vtuber) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vtuber not found',
+            ], 404);
+        }
+
+        if ($vtuber->avatar) {
+            Storage::disk('public')->delete('vtubers/avatar/' . $vtuber->avatar);
+        }
+        if ($vtuber->banner) {
+            Storage::disk('public')->delete('vtubers/banner/' . $vtuber->banner);
+        }
+
+        $vtuber->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Vtuber deleted successfully!'
+        ], 200);
     }
 }

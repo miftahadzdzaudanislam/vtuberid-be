@@ -74,6 +74,7 @@ class VtuberSeeder extends Seeder
                 'gender' => $faker->randomElement($genders),
                 'debut_date' => $faker->dateTimeBetween('-4 years', '-1 month')->format('Y-m-d'),
                 'birthday' => $faker->dateTimeBetween('-30 years', '-18 years')->format('m-d'),
+                'height' => $faker->numberBetween(100, 300),
                 'status' => $faker->randomElement($statuses),
                 'current_affiliation' => $faker->randomElement($affiliations),
                 'avatar' => 'vtubers/avatars/' . Str::slug($name) . '.png',

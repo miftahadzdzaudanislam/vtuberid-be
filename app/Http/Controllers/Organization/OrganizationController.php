@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Organization;
 
+use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use Illuminate\Http\Request;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -11,6 +12,8 @@ class OrganizationController extends Controller
 {
     /**
      * Menampilkan daftar organization
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function daftarOrganization(Request $request)
     {
@@ -47,6 +50,11 @@ class OrganizationController extends Controller
                 'message' => 'Tidak ada data Organisasi ditemukan!'
             ], 200);
         }
+        
+        // Hilangkan pivot dari data vtuber
+        $organizations->getCollection()->each(function ($org) {
+            $org->vtubers->each->makeHidden('pivot');
+        });
 
         return response()->json([
             'success' => true,
@@ -64,7 +72,44 @@ class OrganizationController extends Controller
     }
 
     /**
-     * Menampilkan data organisasi untuk admin
+     * Menampilkan detail vtuber berdasarkan slug
+     * @param string $slug
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function detailOrganization(string $slug)
+    {
+        $organization = Organization::with([
+            'vtubers' => function ($query) {
+                $query->select(
+                    'vtubers.id',
+                    'vtubers.name',
+                    'vtubers.slug',
+                    'vtubers.status'
+                )->selectRaw('organization_members.generation as generation');
+            }
+        ])->where('slug', $slug)->first();
+
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found'
+            ], 404);
+        }
+
+        // Hilangkan pivot dari data vtubers
+        $organization->vtubers->each->makeHidden('pivot');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Get Organization details',
+            'data' => $organization,
+        ], 200);
+    }
+
+    /**
+     *  Menampilkan data organisasi untuk admin
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function index(Request $request)
     {
@@ -157,5 +202,30 @@ class OrganizationController extends Controller
     public function destroy(Organization $organization)
     {
         //
+    }
+
+    /**
+     * Singkronisasi vtuber affiliate
+     * @param Organization $organization
+     * @return void
+     */
+    protected function syncVtuberAffiliations(Organization $organization)
+    {
+        $vtubers = $organization->vtubers()
+            ->wherePivot('status', 'active')
+            ->get();
+
+        foreach ($vtubers as $vtuber) {
+            $hasActiveOrganization = $vtuber->organizations()
+                ->wherePivot('status', 'active')
+                ->where('organizations.status', 'active')
+                ->exists();
+
+            $vtuber->update([
+                'current_affiliation' => $hasActiveOrganization
+                    ? 'organization'
+                    : 'independent'
+            ]);
+        }
     }
 }

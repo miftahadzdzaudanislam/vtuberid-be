@@ -12,7 +12,11 @@ use Tymon\JWTAuth\JWT;
 
 class AuthController extends Controller
 {
-    // Login
+    /**
+     * Login
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function login(Request $request) {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
@@ -37,7 +41,10 @@ class AuthController extends Controller
         return $this->respondWithToken($token, 'Login successfully!');
     }
 
-    // Ambil data user login
+    /**
+     * Ambil data user login
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function me() {
         return response()->json([
             'success' => true,
@@ -45,6 +52,10 @@ class AuthController extends Controller
         ], 200);
     }
 
+    /**
+     * Logout
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function logout() {
         try {
             JWTAuth::invalidate(JWTAuth::getToken());
@@ -61,7 +72,10 @@ class AuthController extends Controller
         }
     }
 
-    // Refresh token
+    /**
+     * Refresh token
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function refresh() {
         try {
             $token = JWTAuth::refresh(JWTAuth::getToken());
@@ -85,7 +99,12 @@ class AuthController extends Controller
         }
     }
 
-    // format response token
+    /**
+     * Format response token
+     * @param mixed $token
+     * @param mixed $message
+     * @return \Illuminate\Http\JsonResponse
+     */
     protected function respondWithToken($token, $message = '') {
         return response()->json([
             'success' => true,

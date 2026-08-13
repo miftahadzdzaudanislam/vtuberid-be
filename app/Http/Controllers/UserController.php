@@ -11,7 +11,11 @@ use function Pest\Laravel\delete;
 
 class UserController extends Controller
 {
-    // Index Users
+    /**
+     * Index Users
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function index(Request $request)
     {
         $limit = $request->input('limit', 50);
@@ -50,7 +54,11 @@ class UserController extends Controller
         ], 200);
     }
 
-    // Delete user
+    /**
+     * Delete user
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function destroy(string $id)
     {
         $user = User::find($id);

@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             VtuberSeeder::class,
 
             OrganizationMemberSeeder::class,
+            OrganizationSocailAccountSeeder::class,
             SocialAccountSeeder::class,
             VtuberTagSeeder::class,
         ]);

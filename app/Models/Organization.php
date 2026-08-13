@@ -36,6 +36,11 @@ class Organization extends Model
         ]);
     }
 
+    public function socialAccounts()
+    {
+        return $this->hasMany(OrganizationSocialAccount::class);
+    }
+
     // Scope
     public function scopeActive($query)
     {

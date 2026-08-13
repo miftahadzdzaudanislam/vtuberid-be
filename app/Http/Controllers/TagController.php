@@ -11,48 +11,9 @@ use Spatie\QueryBuilder\QueryBuilder;
 class TagController extends Controller
 {
     /**
-     * Menampilkan daftar tag
-     */
-    public function daftarTag(Request $request)
-    {
-        $limit = $request->input('limit', 50);
-
-        $tags = QueryBuilder::for(Tag::class)
-            ->allowedFilters(
-                AllowedFilter::callback('search', function ($query, $value) {
-                    $query->where('name', 'like', "%{$value}%");
-                    $query->where('slug', 'like', "%{$value}%");
-                }),
-            )->withCount('vtubers')
-            ->orderBy('updated_at', 'desc')
-            ->paginate($limit)
-            ->appends($request->query());
-        
-        if ($tags->isEmpty()) {
-            return response()->json([
-                'success' => true,
-                'data' => [],
-                'message' => 'No Tag data found!'
-            ], 200);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Get all tags',
-            'data' => $tags->items(),
-            'paggination' => [
-                'total' => $tags->total(),
-                'per_page' => $tags->perPage(),
-                'current_page' => $tags->currentPage(),
-                'last_page' => $tags->lastPage(),
-                'from' => $tags->firstItem(),
-                'to' => $tags->lastItem()
-            ]
-        ], 200);
-    }
-
-    /**
-     * Menampilkan data tag untuk admin
+     * Menampilkan seluruh data tag
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function index(Request $request)
     {
@@ -68,7 +29,7 @@ class TagController extends Controller
             ->orderBy('updated_at', 'desc')
             ->paginate($limit)
             ->appends($request->query());
-        
+
         if ($tags->isEmpty()) {
             return response()->json([
                 'success' => true,

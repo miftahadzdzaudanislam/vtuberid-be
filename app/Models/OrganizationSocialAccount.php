@@ -5,24 +5,23 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class SocialAccount extends Model
+class OrganizationSocialAccount extends Model
 {
     use HasFactory;
 
-    protected $table = 'social_accounts';
+    protected $table = 'organization_social_accounts';
 
     protected $fillable = [
-        'vtuber_id',
+        'organization_id',
         'platform_id',
         'username',
-        'url',
-        'followers'
+        'url'
     ];
 
     // Relationships
-    public function vtuber()
+    public function organization()
     {
-        return $this->belongsTo(Vtuber::class);
+        return $this->belongsTo(Organization::class);
     }
 
     public function platform()

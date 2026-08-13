@@ -19,6 +19,7 @@ class Vtuber extends Model
         'gender',
         'debut_date',
         'birthday',
+        'height',
         'status',
         'current_affiliation',
         'avatar',
@@ -47,7 +48,9 @@ class Vtuber extends Model
     {
         return $this->belongsToMany(
             Organization::class,
-            'organization_members'
+            'organization_members',
+            'vtuber_id',
+            'organization_id'
         )->withPivot([
             'generation',
             'joined_at',
@@ -100,5 +103,20 @@ class Vtuber extends Model
     public function isIndependent()
     {
         return !$this->organizations()->wherePivot('status', 'active')->exists();
+    }
+
+    public function updateCurrentAffiliation()
+    {
+        $hasActiveAgency = $this->organizations()
+            ->where('organizations.type', 'agency')
+            ->where('organizations.status', 'active')
+            ->wherePivot('status', 'active')
+            ->exists();
+
+        $this->update([
+            'current_affiliation' => $hasActiveAgency
+                ? 'organization'
+                : 'independent',
+        ]);
     }
 }

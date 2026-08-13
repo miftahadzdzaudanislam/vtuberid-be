@@ -27,11 +27,7 @@ class OrganizationMemberSeeder extends Seeder
         }
 
         $generations = ['Gen 1', 'Gen 2', 'Gen 3'];
-        $statuses = array_merge(
-            array_fill(0, 7, 'active'),
-            array_fill(0, 2, 'graduated'),
-            array_fill(0, 1, 'left'),
-        );
+        $statuses = ['active', 'graduated', 'left'];
 
         foreach ($vtubers as $vtuber) {
             $status = $faker->randomElement($statuses);
@@ -54,7 +50,11 @@ class OrganizationMemberSeeder extends Seeder
             ]);
 
             if ($status !== 'active') {
-                DB::table('vtubers')->where('id', $vtuber->id)->update(['current_affiliation' => 'independent']);
+                DB::table('vtubers')
+                    ->where('id', $vtuber->id)
+                    ->update([
+                        'current_affiliation' => 'independent',
+                    ]);
             }
         }
     }
