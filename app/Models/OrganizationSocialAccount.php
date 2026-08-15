@@ -15,7 +15,7 @@ class OrganizationSocialAccount extends Model
         'organization_id',
         'platform_id',
         'username',
-        'url'
+        'url',
     ];
 
     // Relationships

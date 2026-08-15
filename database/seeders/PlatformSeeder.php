@@ -21,6 +21,7 @@ class PlatformSeeder extends Seeder
             'X (Twitter)' => 'https://x.com',
             'Instagram'   => 'https://www.instagram.com',
             'TikTok'      => 'https://www.tiktok.com',
+            'FaceBook'    => 'https://www/facebook.com',
         ];
 
         foreach ($platforms as $name => $baseUrl) {

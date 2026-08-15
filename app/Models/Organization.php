@@ -36,7 +36,7 @@ class Organization extends Model
         ]);
     }
 
-    public function socialAccounts()
+    public function orgSocialAccounts()
     {
         return $this->hasMany(OrganizationSocialAccount::class);
     }
@@ -71,5 +71,27 @@ class Organization extends Model
     public function isGroup()
     {
         return $this->type === 'group';
+    }
+
+    public function syncVtuberMembership()
+    {
+        if ($this->status !== 'liquidated') {
+            return;
+        }
+
+        $this->vtubers()
+            ->wherePivot('status', 'active')
+            ->get()
+            ->each(function ($vtuber) {
+
+                $this->vtubers()->updateExistingPivot(
+                    $vtuber->id,
+                    [
+                        'status' => 'graduated',
+                    ]
+                );
+
+                $vtuber->updateCurrentAffiliation();
+            });
     }
 }

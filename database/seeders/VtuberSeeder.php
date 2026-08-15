@@ -58,7 +58,13 @@ class VtuberSeeder extends Seeder
             array_fill(0, 4, 'organization'),
             array_fill(0, 1, 'independent'),
         );
-        $statuses = ['active', 'inactive', 'hiatus', 'graduated', 'retired', 'unknown'];
+        $statuses = array_merge(
+            array_fill(0, 4, 'active'),
+            // array_fill(0, 2, 'inactive'),
+            // array_fill(0, 1, 'graduated'),
+            // array_fill(0, 1, 'retired'),
+            // array_fill(0, 1, 'unknown'),
+        );
 
         $names = [];
         while (count($names) < 10) {

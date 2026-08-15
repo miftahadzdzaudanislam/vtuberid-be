@@ -119,4 +119,21 @@ class Vtuber extends Model
                 : 'independent',
         ]);
     }
+
+    public function syncOrganizationStatus()
+    {
+        if ($this->status === 'retired') {
+
+            $this->organizations()->each(function ($organization) {
+                $organization->pivot->status = 'left';
+                $organization->pivot->save();
+            });
+        } elseif ($this->status === 'graduated') {
+
+            $this->organizations()->each(function ($organization) {
+                $organization->pivot->status = 'graduated';
+                $organization->pivot->save();
+            });
+        }
+    }
 }

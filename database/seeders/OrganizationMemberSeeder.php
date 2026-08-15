@@ -27,7 +27,11 @@ class OrganizationMemberSeeder extends Seeder
         }
 
         $generations = ['Gen 1', 'Gen 2', 'Gen 3'];
-        $statuses = ['active', 'graduated', 'left'];
+        $statuses = array_merge(
+            array_fill(0, 4, 'active'),
+            // array_fill(0, 1, 'graduated'),
+            // array_fill(0, 1, 'left'),
+        );
 
         foreach ($vtubers as $vtuber) {
             $status = $faker->randomElement($statuses);

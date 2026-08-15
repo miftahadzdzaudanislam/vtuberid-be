@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -39,7 +40,6 @@ class VtuberController extends Controller
                 }),
                 AllowedFilter::exact('status'),
             )->with([
-                'tags:id,name,slug',
                 'organizations' => function ($query) {
                     $query->select(
                         'organizations.id',
@@ -47,6 +47,7 @@ class VtuberController extends Controller
                         'organizations.slug',
                     )->wherePivot('status', 'active');
                 },
+                'tags:id,name,slug',
             ])->orderBy('name', 'asc')
             ->paginate($limit)
             ->appends($request->query());
@@ -142,7 +143,6 @@ class VtuberController extends Controller
                     });
                 }),
             )->with([
-                'tags:id,name,slug',
                 'organizations' => function ($query) {
                     $query->select(
                         'organizations.id',
@@ -150,6 +150,7 @@ class VtuberController extends Controller
                         'organizations.slug',
                     )->wherePivot('status', 'active');
                 },
+                'tags:id,name,slug',
             ])->orderBy('name', 'asc')
             ->paginate($limit)
             ->appends($request->query());
@@ -294,10 +295,11 @@ class VtuberController extends Controller
      */
     public function show(string $id)
     {
+        // Search Vtuber
         $vtuber = Vtuber::with([
             'organizations:id,name,slug,type,logo',
             'tags:id,name,slug',
-            'socialAccounts:id,vtuber_id,platform_id,username,url'
+            'socialAccounts:id,vtuber_id,platform_id,username,url,followers'
         ])->find($id);
 
         if (!$vtuber) {
@@ -315,7 +317,10 @@ class VtuberController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update Vtuber
+     * @param Request $request
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function update(Request $request, string $id)
     {
@@ -331,7 +336,7 @@ class VtuberController extends Controller
         // Validator
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:vtubers,slug,' . $id,
+            'slug' => 'nullable|string|max:255|' . Rule::unique('vtubers', 'slug')->ignore($vtuber->id),
             'description' => 'nullable|string',
             'gender' => 'required|in:male,female',
             'debut_date' => 'nullable|date',
@@ -342,13 +347,6 @@ class VtuberController extends Controller
             'banner' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
 
             'tag_ids' => 'nullable|string',
-
-            'platforms' => 'nullable|array',
-            'platforms.*.id' => 'nullable|integer|exists:social_accounts,id',
-            'platforms.*.platform_id' => 'required|integer|exists:platforms,id',
-            'platforms.*.username' => 'required|string|max:255',
-            'platforms.*.url' => 'required|url|max:500',
-            'platforms.*.followers' => 'required|numeric'
         ]);
 
         // Check Validator errors
@@ -361,16 +359,12 @@ class VtuberController extends Controller
 
         // Get data
         $tagIds = $request->input('tag_ids', []);
-        $platforms = $request->input('platforms', []);
 
         // Convert string to array
         if (is_string($tagIds)) {
             $tagIds = array_filter(
                 array_map('intval', explode(',', $tagIds))
             );
-        }
-        if (is_string($platforms)) {
-            $platforms = json_decode($platforms, true) ?? [];
         }
 
         // siapkan data yang ingin di update
@@ -413,40 +407,27 @@ class VtuberController extends Controller
         // Update vtuber
         $vtuber->update($data);
 
+        // Sync and update status
+        $vtuber->syncOrganizationStatus();
+        $vtuber->updateCurrentAffiliation();
+
         // Update Tags
         if ($request->has('tag_ids')) {
             $vtuber->tags()->syncWithoutDetaching($tagIds);
         }
 
-        // Update Social Accounts
-        if ($request->has('platforms')) {
-            $vtuber->socialAccounts()->delete();
-
-            foreach ($platforms as $account) {
-                $vtuber->socialAccounts()->create([
-                    'platform_id' => $account['platform_id'],
-                    'username' => $account['username'],
-                    'url' => $account['url'],
-                    'followers' => $account['followers'],
-                ]);
-            }
-        }
-
-        // dd($request->all());
-
         // Return respons json
         return response()->json([
             'success' => true,
             'message' => 'Vtuber updated successfully!',
-            'data' => $vtuber->load([
-                'tags:id,name,slug',
-                'socialAccounts:id,vtuber_id,platform_id,username,url,followers'
-            ])
+            'data' => $vtuber,
         ], 200);
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Delete Vtuber
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function destroy(string $id)
     {

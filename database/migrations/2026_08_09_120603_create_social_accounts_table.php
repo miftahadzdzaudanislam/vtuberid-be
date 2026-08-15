@@ -19,6 +19,8 @@ return new class extends Migration
             $table->string('url');
             $table->unsignedInteger('followers')->default(0);
             $table->timestamps();
+
+            $table->unique(['vtuber_id', 'platform_id']);
         });
     }
 
