@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\Validator;
 
 class OrganizationSocialAccountController extends Controller
 {
+    /**
+     * Create a new social account organization
+     * @param Request $request
+     * @param string $org
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function store(Request $request, string $org)
     {
         // Find Organization
@@ -61,8 +67,24 @@ class OrganizationSocialAccountController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, Organization $organization, string $socialAccountId)
+    /**
+     * Update social account organization
+     * @param Request $request
+     * @param string $organizationId
+     * @param string $socialAccountId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function update(Request $request, string $organizationId, string $socialAccountId)
     {
+        // Find Organization
+        $organization = Organization::find($organizationId);
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found',
+            ], 404);
+        }
+
         // Check Social account
         $socialAccount = OrganizationSocialAccount::find($socialAccountId);
         if (!$socialAccount) {
@@ -123,8 +145,23 @@ class OrganizationSocialAccountController extends Controller
         ], 200);
     }
 
-    public function destroy(Organization $organization, string $socialAccountId)
+    /**
+     * Delete social account organization
+     * @param string $organizationId
+     * @param string $socialAccountId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroy(string $organizationId, string $socialAccountId)
     {
+        // Find Organization
+        $organization = Organization::find($organizationId);
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found',
+            ], 404);
+        }
+
         // Check Social account
         $socialAccount = OrganizationSocialAccount::find($socialAccountId);
         if (!$socialAccount) {

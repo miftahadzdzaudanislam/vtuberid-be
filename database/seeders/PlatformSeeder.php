@@ -30,7 +30,7 @@ class PlatformSeeder extends Seeder
             DB::table('platforms')->insert([
                 'name' => $name,
                 'slug' => $slug,
-                'icon' => 'platforms/' . $slug . '.svg',
+                'icon' => 'platforms/default/' . $slug . '.png',
                 'base_url' => $baseUrl,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),

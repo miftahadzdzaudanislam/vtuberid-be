@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Organization\OrganizationSocialAccountController;
+use App\Http\Controllers\PlatformController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Vtuber\VtuberController;
@@ -28,29 +29,28 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/me', [AuthController::class, 'me']);
 
-    // ========================= ADMIN ROUTES ===============================
-    Route::middleware('role:admin')->group(function () {
-        Route::get('/admin/dashboard', [AdminController::class, 'dashboardAdmin']);
+    // ========================= ADMIN + EDITOR ROUTES ===============================
+    Route::middleware('role:admin,editor')->prefix('admin')->group(function () {
+        Route::get('/dashboard', [AdminController::class, 'dashboardAdmin']);
 
-        Route::apiResource('/admin/vtubers', VtuberController::class);
-        Route::apiResource('/admin/vtubers/{vtuber}/organizations', VtuberOrganizationController::class);
-        Route::apiResource('/admin/vtubers/{vtuber}/social-accounts', VtuberSocialAccountController::class);
-        Route::apiResource('/admin/organizations', OrganizationController::class);
-        Route::apiResource('/admin/organizations/{organization}/social-accounts', OrganizationSocialAccountController::class);
-        Route::apiResource('/admin/tags', TagController::class);
+        Route::apiResource('/vtubers', VtuberController::class)->except('destroy');
+        Route::apiResource('/vtubers/{vtuber}/organizations', VtuberOrganizationController::class);
+        Route::apiResource('/vtubers/{vtuber}/social-accounts', VtuberSocialAccountController::class);
 
-        Route::apiResource('/admin/users', UserController::class);
+        Route::apiResource('/organizations', OrganizationController::class)->except('destroy');
+        Route::apiResource('/organizations/{organization}/social-accounts', OrganizationSocialAccountController::class);
+
+        Route::apiResource('/tags', TagController::class);
     });
 
-    // ========================= EDITOR ROUTES ===============================
-    Route::middleware('role:editor')->group(function () {
-        Route::get('/editor/dashboard', [AdminController::class, 'dashboardEditor']);
+    // ========================= ADMIN ONLY ROUTES ===============================
+    Route::middleware('role:admin')->prefix('admin')->group(function () {
+        Route::get('/dashboard', [AdminController::class, 'dashboardEditor']);
 
-        Route::apiResource('/editor/vtubers', VtuberController::class)
-            ->only(['index', 'store', 'show', 'update']);
-        Route::apiResource('/editor/organizations', OrganizationController::class)
-            ->only(['index', 'store', 'show', 'update']);
-        Route::apiResource('/editor/tags', TagController::class)
-            ->only(['index', 'store', 'show', 'update']);
+        Route::delete('/vtubers/{id}', [VtuberController::class, 'destroy']);
+        Route::delete('/organizations/{id}', [OrganizationController::class, 'destroy']);
+
+        Route::apiResource('/platforms', PlatformController::class);
+        Route::apiResource('/users', UserController::class);
     });
 });

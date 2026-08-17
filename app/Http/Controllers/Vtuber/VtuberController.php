@@ -90,7 +90,8 @@ class VtuberController extends Controller
         $vtuber = Vtuber::with([
             'organizations:id,name,slug,type,logo',
             'tags:id,name,slug',
-            'socialAccounts:id,vtuber_id,platform_id,username,url,followers'
+            'socialAccounts:id,vtuber_id,platform_id,username,url,followers',
+            'socialAccounts.platform:id,name,icon'
         ])->where('slug', $slug)->first();
 
         if (!$vtuber) {
@@ -283,7 +284,8 @@ class VtuberController extends Controller
             'message' => 'Vtuber created successfully!',
             'data' => $vtuber->load([
                 'tags:id,name,slug',
-                'socialAccounts:id,vtuber_id,platform_id,username,url,followers'
+                'socialAccounts:id,vtuber_id,platform_id,username,url,followers',
+                'socialAccounts.platform:id,name,icon'
             ])
         ], 201);
     }
@@ -299,7 +301,8 @@ class VtuberController extends Controller
         $vtuber = Vtuber::with([
             'organizations:id,name,slug,type,logo',
             'tags:id,name,slug',
-            'socialAccounts:id,vtuber_id,platform_id,username,url,followers'
+            'socialAccounts:id,vtuber_id,platform_id,username,url,followers',
+            'socialAccounts.platform:id,name'
         ])->find($id);
 
         if (!$vtuber) {

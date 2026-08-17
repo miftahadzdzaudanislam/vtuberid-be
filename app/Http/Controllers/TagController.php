@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Tag;
 use App\Models\Vtuber;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -54,35 +55,57 @@ class TagController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
      * Store a newly created resource in storage.
      */
     public function store(Request $request)
     {
-        //
+        // Validator
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'slug' => 'required|string|max:255|unique:tags,slug'
+        ]);
+
+        // Check Validator errors
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors(),
+            ], 422);
+        }
+
+        // Insert data
+        $tag = Tag::create([
+            'name' => $request->name,
+            'slug' => $request->slug,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tag created successfully!',
+            'data' => $tag
+        ], 201);
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(Tag $tag)
+    public function show(string $id)
     {
-        //
-    }
+        // Search Tag
+        $tag = Tag::withCount('vtubers')->find($id);
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Tag $tag)
-    {
-        //
+        if (!$tag) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tag not found'
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Get tag details',
+            'data' => $tag,
+        ], 200);
     }
 
     /**

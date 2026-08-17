@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Vtuber;
 
 use App\Http\Controllers\Controller;
+use App\Models\Platform;
 use App\Models\SocialAccount;
 use App\Models\Vtuber;
 use Illuminate\Http\Request;
@@ -24,6 +25,15 @@ class VtuberSocialAccountController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Vtuber not found',
+            ], 404);
+        }
+
+        // Find Platform
+        $platform = Platform::find($request->platform_id);
+        if (!$platform) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Plaftorm not found',
             ], 404);
         }
 
@@ -72,12 +82,21 @@ class VtuberSocialAccountController extends Controller
     /**
      * Update social account vtuber
      * @param Request $request
-     * @param Vtuber $vtuber
+     * @param string $vtuberId
      * @param string $socialAccountId
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, Vtuber $vtuber, string $socialAccountId)
+    public function update(Request $request, string $vtuberId, string $socialAccountId)
     {
+        // Check Vtuber
+        $vtuber = Vtuber::find($vtuberId);
+        if (!$vtuber) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vtuber not found.',
+            ], 404);
+        }
+
         // Check Social account
         $socialAccount = SocialAccount::find($socialAccountId);
         if (!$socialAccount) {
@@ -142,12 +161,21 @@ class VtuberSocialAccountController extends Controller
 
     /**
      * Delete social account vtuber
-     * @param Vtuber $vtuber
+     * @param string $vtuberId
      * @param string $socialAccountId
      * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy(Vtuber $vtuber, string $socialAccountId)
+    public function destroy(string $vtuberId, string $socialAccountId)
     {
+        // Find Vtuber
+        $vtuber = Vtuber::find($vtuberId);
+        if (!$vtuber) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vtuber not found',
+            ], 404);
+        }
+
         // Check Social account
         $socialAccount = SocialAccount::find($socialAccountId);
         if (!$socialAccount) {

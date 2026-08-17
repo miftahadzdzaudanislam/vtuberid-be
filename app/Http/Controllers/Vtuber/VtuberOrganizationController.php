@@ -27,6 +27,15 @@ class VtuberOrganizationController extends Controller
             ], 404);
         }
 
+        // Find Organization
+        $organization = Organization::find($request->organization_id);
+        if (!$organization) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organization not found',
+            ], 404);
+        }
+
         // Validator
         $validator = Validator::make($request->all(), [
             'organization_id' => 'required|exists:organizations,id',
@@ -78,12 +87,21 @@ class VtuberOrganizationController extends Controller
     /**
      * Update organization member
      * @param Request $request
-     * @param Vtuber $vtuber
+     * @param string $vtuberId
      * @param string $organizationId
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, Vtuber $vtuber, string $organizationId)
+    public function update(Request $request, string $vtuberId, string $organizationId)
     {
+        // Find Vtuber
+        $vtuber = Vtuber::find($vtuberId);
+        if (!$vtuber) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vtuber not found',
+            ], 404);
+        }
+
         // Check organization
         $organization = Organization::find($organizationId);
         if (!$organization) {
@@ -142,12 +160,21 @@ class VtuberOrganizationController extends Controller
 
     /**
      * Delete organization member
-     * @param Vtuber $vtuber
+     * @param string $vtuberId
      * @param string $organizationId
      * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy(Vtuber $vtuber, string $organizationId)
+    public function destroy(string $vtuberId, string $organizationId)
     {
+        // Find Vtuber
+        $vtuber = Vtuber::find($vtuberId);
+        if (!$vtuber) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vtuber not found',
+            ], 404);
+        }
+
         // Check organization
         $organization = Organization::find($organizationId);
         if (!$organization) {

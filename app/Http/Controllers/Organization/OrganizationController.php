@@ -32,8 +32,8 @@ class OrganizationController extends Controller
             ])
             ->allowedFilters(
                 AllowedFilter::callback('search', function ($query, $value) {
-                    $query->where('name', 'like', "%$value%");
-                    $query->where('slug', 'like', "%$value%");
+                    $query->where('name', 'like', "%{$value}%");
+                    $query->orWhere('slug', 'like', "%{$value}%");
                 }),
                 AllowedFilter::exact('status'),
                 AllowedFilter::exact('type'),
@@ -85,6 +85,7 @@ class OrganizationController extends Controller
         $organization = Organization::with([
             'vtubers:id,name,slug,status',
             'orgSocialAccounts:id,organization_id,platform_id,username,url',
+            'orgSocialAccounts.platform:id,name,icon',
         ])->withCount('vtubers as talent_count')->where('slug', $slug)->first();
 
         if (!$organization) {
@@ -113,8 +114,8 @@ class OrganizationController extends Controller
         $organizations = QueryBuilder::for(Organization::class)
             ->allowedFilters(
                 AllowedFilter::callback('search', function ($query, $value) {
-                    $query->where('name', 'like', "%$value%");
-                    $query->where('slug', 'like', "%$value%");
+                    $query->where('name', 'like', "%{$value}%");
+                    $query->orWhere('slug', 'like', "%{$value}%");
                 }),
                 AllowedFilter::exact('status'),
                 AllowedFilter::exact('type'),
@@ -235,7 +236,9 @@ class OrganizationController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * Menampilkan detail organisasi berdasarkan ID
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function show(string $id)
     {
