@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Platform;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -54,14 +56,21 @@ class PlatformController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Create a new platform
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function store(Request $request)
     {
+        // Generate slug jika user tidak mengisi slug
+        $slug = $request->filled('slug') ? $request->slug : Str::slug($request->name);
+
         // Validator
-        $validator = Validator::make($request->all(), [
+        $validator = Validator::make(array_merge($request->all(), [
+            'slug' => $slug
+        ]), [
             'name' => 'required|string|max:255',
-            'slug' => 'required|string|max:255|unique:tags,slug',
+            'slug' => 'required|string|max:255|unique:platforms,slug',
             'icon' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
             'base_url' => 'required|url|max:500'
         ]);
@@ -74,20 +83,12 @@ class PlatformController extends Controller
             ], 422);
         }
 
-        // Generate slug jika tidak dikirim
-        $slug = $request->slug ?? Str::slug($request->name);
-        if (Platform::where('slug', $slug)->exists()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'This platform already exists.',
-            ], 409);
-        }
-
+        // handle image icon
         $iconPath = null;
         if ($request->hasFile('icon')) {
             $icon = $request->file('icon');
             $ext = $icon->getClientOriginalExtension();
-            $filename = Str::slug($request->icon) . '_' . time() . '.' . $ext;
+            $filename = Str::slug($request->name) . '_' . time() . '.' . $ext;
             $iconPath = $icon->storeAs('platforms/icon', $filename, 'public');
         }
 
@@ -107,7 +108,9 @@ class PlatformController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * Detail Platform berdasarkan ID
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function show(string $id)
     {
@@ -129,18 +132,103 @@ class PlatformController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update platform
+     * @param Request $request
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, Platform $platform)
+    public function update(Request $request, string $id)
     {
-        //
+        // Find platform
+        $platform = Platform::find($id);
+        if (!$platform) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Platform not found',
+            ], 404);
+        }
+
+        // Generate slug jika user tidak mengisi slug
+        $slug = $request->filled('slug') ? $request->slug : Str::slug($request->name);
+
+        // Validator
+        $validator = Validator::make(array_merge($request->all(), [
+            'slug' => $slug
+        ]), [
+            'name' => 'required|string|max:255',
+            'slug' => 'required|string|max:255|' . Rule::unique('platforms', 'slug')->ignore($platform->id),
+            'icon' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'base_url' => 'required|url|max:500'
+        ]);
+
+        // Check Validator errors
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors(),
+            ], 422);
+        }
+
+        // siapkan data yang ingin di update
+        $data = [
+            'name' => $request->name,
+            'slug' => $slug,
+            'base_url' => $request->base_url
+        ];
+
+        // handle image icon
+        if ($request->hasFile('icon')) {
+            $icon = $request->file('icon');
+            $ext = $icon->getClientOriginalExtension();
+            $filename = Str::slug($request->name) . '_' . time() . '.' . $ext;
+            $iconPath = $icon->storeAs('platforms/icon', $filename, 'public');
+
+            // Hanya hapus icon hasil upload custom
+            if (
+                $platform->icon &&
+                !str_starts_with($platform->icon, 'platforms/default/')
+            ) {
+                Storage::disk('public')->delete($platform->icon);
+            }
+            $data['icon'] = $iconPath;
+        }
+
+        $platform->update($data);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Platform updated successfully!',
+            'data' => $platform->fresh()
+        ], 200);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Platform $platform)
+    public function destroy(string $id)
     {
-        //
+        // Find platform
+        $platform = Platform::find($id);
+        if (!$platform) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Platform not found',
+            ], 404);
+        }
+
+        // Hanya hapus icon hasil upload custom
+        if (
+            $platform->icon &&
+            !str_starts_with($platform->icon, 'platforms/default/')
+        ) {
+            Storage::disk('public')->delete($platform->icon);
+        }
+
+        $platform->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Platform deleted successfully!',
+        ], 200);
     }
 }

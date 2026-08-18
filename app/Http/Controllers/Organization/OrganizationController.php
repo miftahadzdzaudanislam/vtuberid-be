@@ -170,10 +170,15 @@ class OrganizationController extends Controller
      */
     public function store(Request $request)
     {
+        // Generate slug jika user tidak mengisi slug
+        $slug = $request->filled('slug') ? $request->slug : Str::slug($request->name);
+
         // Validator
-        $validator = Validator::make($request->all(), [
+        $validator = Validator::make(array_merge($request->all(), [
+            'slug' => $slug
+        ]), [
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:organizations,slug',
+            'slug' => 'required|string|max:255|unique:organizations,slug',
             'type' => 'required|in:agency,group',
             'description' => 'nullable|string',
             'logo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
@@ -206,7 +211,7 @@ class OrganizationController extends Controller
         // Insert Organization
         $org = Organization::create([
             'name' => $request->name,
-            'slug' => $request->slug ?? Str::slug($request->name),
+            'slug' => $slug,
             'type' => $request->type,
             'description' => $request->description,
             'logo' => $logoPath,
@@ -278,10 +283,15 @@ class OrganizationController extends Controller
             ], 404);
         }
 
+        // Generate slug jika user tidak mengisi slug
+        $slug = $request->filled('slug') ? $request->slug : Str::slug($request->name);
+
         // Validator
-        $validator = Validator::make($request->all(), [
+        $validator = Validator::make(array_merge($request->all(), [
+            'slug' => $slug
+        ]), [
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|' . Rule::unique('organizations', 'slug')->ignore($org->id),
+            'slug' => 'required|string|max:255|' . Rule::unique('organizations', 'slug')->ignore($org->id),
             'type' => 'required|in:agency,group',
             'description' => 'nullable|string',
             'logo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
@@ -300,7 +310,7 @@ class OrganizationController extends Controller
         // Siapkan data
         $data = [
             'name' => $request->name,
-            'slug' => $request->slug ?? Str::slug($request->name),
+            'slug' => $slug,
             'type' => $request->type,
             'description' => $request->description,
             'website' => $request->website,
@@ -312,12 +322,12 @@ class OrganizationController extends Controller
             $logo = $request->file('logo');
             $ext = $logo->getClientOriginalExtension();
             $filename = Str::slug($request->name) . '_' . time() . '.' . $ext;
-            $logo->storeAs('organizations/logo', $filename, 'public');
+            $logoPath = $logo->storeAs('organizations/logo', $filename, 'public');
 
             if ($org->logo) {
-                Storage::disk('public')->delete('organizations/logo/' . $org->logo);
+                Storage::disk('public')->delete($org->logo);
             }
-            $data['logo'] = $filename;
+            $data['logo'] = $logoPath;
         }
 
         // Simpan status lama
@@ -363,7 +373,7 @@ class OrganizationController extends Controller
         $vtubers = $org->vtubers()->get();
 
         if ($org->logo) {
-            Storage::disk('public')->delete('organizations/logo/' . $org->logo);
+            Storage::disk('public')->delete($org->logo);
         }
 
         $org->delete();

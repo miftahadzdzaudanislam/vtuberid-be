@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Tag;
-use App\Models\Vtuber;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -55,12 +56,19 @@ class TagController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Create a new tag
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function store(Request $request)
     {
+        // Generate slug jika user tidak mengisi slug
+        $slug = $request->filled('slug') ? $request->slug : Str::slug($request->name);
+
         // Validator
-        $validator = Validator::make($request->all(), [
+        $validator = Validator::make(array_merge($request->all(), [
+            'slug' => $slug
+        ]), [
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:tags,slug'
         ]);
@@ -76,7 +84,7 @@ class TagController extends Controller
         // Insert data
         $tag = Tag::create([
             'name' => $request->name,
-            'slug' => $request->slug,
+            'slug' => $slug,
         ]);
 
         return response()->json([
@@ -87,7 +95,9 @@ class TagController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * Menampilkan detail tag berdasarkan ID
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function show(string $id)
     {
@@ -109,18 +119,75 @@ class TagController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update tag
+     * @param Request $request
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, Tag $tag)
+    public function update(Request $request, string $id)
     {
-        //
+        // Find Tag
+        $tag = Tag::find($id);
+        if (!$tag) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tag not found',
+            ], 404);
+        }
+
+        // Generate slug jika user tidak mengisi slug
+        $slug = $request->filled('slug') ? $request->slug : Str::slug($request->name);
+
+        // Validator
+        $validator = Validator::make(array_merge($request->all(), [
+            'slug' => $slug
+        ]), [
+            'name' => 'required|string|max:255',
+            'slug' => 'required|string|max:255|' . Rule::unique('tags', 'slug')->ignore($tag->id)
+        ]);
+
+        // Check Validator errors
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors(),
+            ], 422);
+        }
+
+        // update tag
+        $tag->update([
+            'name' => $request->name,
+            'slug' => $slug,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tag updated successfully!',
+            'data' => $tag
+        ], 200);
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Delete tag
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy(Tag $tag)
+    public function destroy(string $id)
     {
-        //
+        // Find Tag
+        $tag = Tag::find($id);
+        if (!$tag) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tag not found',
+            ], 404);
+        }
+
+        $tag->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tag deleted successfully!',
+        ], 200);
     }
 }

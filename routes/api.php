@@ -31,7 +31,7 @@ Route::middleware('auth:api')->group(function () {
 
     // ========================= ADMIN + EDITOR ROUTES ===============================
     Route::middleware('role:admin,editor')->prefix('admin')->group(function () {
-        Route::get('/dashboard', [AdminController::class, 'dashboardAdmin']);
+        Route::get('/dashboard', [AdminController::class, 'dashboard']);
 
         Route::apiResource('/vtubers', VtuberController::class)->except('destroy');
         Route::apiResource('/vtubers/{vtuber}/organizations', VtuberOrganizationController::class);
@@ -45,8 +45,6 @@ Route::middleware('auth:api')->group(function () {
 
     // ========================= ADMIN ONLY ROUTES ===============================
     Route::middleware('role:admin')->prefix('admin')->group(function () {
-        Route::get('/dashboard', [AdminController::class, 'dashboardEditor']);
-
         Route::delete('/vtubers/{id}', [VtuberController::class, 'destroy']);
         Route::delete('/organizations/{id}', [OrganizationController::class, 'destroy']);
 

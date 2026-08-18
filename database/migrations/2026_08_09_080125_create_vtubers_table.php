@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('vtubers', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('slug');
+            $table->string('slug')->unique();
             $table->text('description')->nullable();
             $table->enum('gender', ['male', 'female']);
             $table->date('debut_date')->nullable();

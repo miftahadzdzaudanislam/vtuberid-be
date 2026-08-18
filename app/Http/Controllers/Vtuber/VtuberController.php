@@ -186,10 +186,15 @@ class VtuberController extends Controller
      */
     public function store(Request $request)
     {
+        // Generate slug jika user tidak mengisi slug
+        $slug = $request->filled('slug') ? $request->slug : Str::slug($request->name);
+
         // Validator
-        $validator = Validator::make($request->all(), [
+        $validator = Validator::make(array_merge($request->all(), [
+            'slug' => $slug
+        ]), [
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:vtubers,slug',
+            'slug' => 'required|string|max:255|unique:vtubers,slug',
             'description' => 'nullable|string',
             'gender' => 'required|in:male,female',
             'debut_date' => 'nullable|date',
@@ -244,14 +249,14 @@ class VtuberController extends Controller
         if ($request->hasFile('banner')) {
             $banner = $request->file('banner');
             $ext = $banner->getClientOriginalExtension();
-            $filename = Str::slug($request->name) . '_' . time() . '.' . $ext;
+            $filename = Str::slug($request->name) . '_banner_' . time() . '.' . $ext;
             $bannerPath = $banner->storeAs('vtubers/banner', $filename, 'public');
         }
 
         // Insert Vtuber
         $vtuber = Vtuber::create([
             'name' => $request->name,
-            'slug' => $request->slug ?? Str::slug($request->name),
+            'slug' => $slug,
             'description' => $request->description,
             'gender' => $request->gender,
             'debut_date' => $request->debut_date,
@@ -336,10 +341,15 @@ class VtuberController extends Controller
             ], 404);
         }
 
+        // Generate slug jika user tidak mengisi slug
+        $slug = $request->filled('slug') ? $request->slug : Str::slug($request->name);
+
         // Validator
-        $validator = Validator::make($request->all(), [
+        $validator = Validator::make(array_merge($request->all(), [
+            'slug' => $slug
+        ]), [
             'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|' . Rule::unique('vtubers', 'slug')->ignore($vtuber->id),
+            'slug' => 'required|string|max:255|' . Rule::unique('vtubers', 'slug')->ignore($vtuber->id),
             'description' => 'nullable|string',
             'gender' => 'required|in:male,female',
             'debut_date' => 'nullable|date',
@@ -373,7 +383,7 @@ class VtuberController extends Controller
         // siapkan data yang ingin di update
         $data = [
             'name' => $request->name,
-            'slug' => $request->slug ?? Str::slug($request->name),
+            'slug' => $slug,
             'description' => $request->description,
             'gender' => $request->gender,
             'debut_date' => $request->debut_date,
@@ -387,24 +397,24 @@ class VtuberController extends Controller
             $avatar = $request->file('avatar');
             $ext = $avatar->getClientOriginalExtension();
             $filename = Str::slug($request->name) . '_' . time() . '.' . $ext;
-            $avatar->storeAs('vtubers/avatar', $filename, 'public');
+            $avatarPath = $avatar->storeAs('vtubers/avatar', $filename, 'public');
 
             if ($vtuber->avatar) {
-                Storage::disk('public')->delete('vtubers/avatar/' . $vtuber->avatar);
+                Storage::disk('public')->delete($vtuber->avatar);
             }
-            $data['avatar'] = $filename;
+            $data['avatar'] = $avatarPath;
         }
 
         if ($request->hasFile('banner')) {
             $banner = $request->file('banner');
             $ext = $banner->getClientOriginalExtension();
-            $filename = Str::slug($request->name) . '_' . time() . '.' . $ext;
-            $banner->storeAs('vtubers/banner', $filename, 'public');
+            $filename = Str::slug($request->name) . '_banner_' . time() . '.' . $ext;
+            $bannerPath = $banner->storeAs('vtubers/banner', $filename, 'public');
 
             if ($vtuber->banner) {
-                Storage::disk('public')->delete('vtubers/banner/' . $vtuber->banner);
+                Storage::disk('public')->delete($vtuber->banner);
             }
-            $data['banner'] = $filename;
+            $data['banner'] = $bannerPath;
         }
 
         // Update vtuber
@@ -444,10 +454,10 @@ class VtuberController extends Controller
         }
 
         if ($vtuber->avatar) {
-            Storage::disk('public')->delete('vtubers/avatar/' . $vtuber->avatar);
+            Storage::disk('public')->delete($vtuber->avatar);
         }
         if ($vtuber->banner) {
-            Storage::disk('public')->delete('vtubers/banner/' . $vtuber->banner);
+            Storage::disk('public')->delete($vtuber->banner);
         }
 
         $vtuber->delete();
