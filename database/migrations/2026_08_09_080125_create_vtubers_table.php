@@ -19,6 +19,7 @@ return new class extends Migration
             $table->enum('gender', ['male', 'female']);
             $table->date('debut_date')->nullable();
             $table->string('birthday', 5)->nullable();
+            $table->date('graduate_date')->nullable();
             $table->unsignedSmallInteger('height')->nullable();
             $table->enum('status', ['active', 'inactive', 'hiatus', 'graduated', 'retired', 'unknown'])
                 ->default('active');

@@ -10,8 +10,6 @@ use Illuminate\Validation\Rule;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
-use function Pest\Laravel\delete;
-
 class UserController extends Controller
 {
     /**
@@ -26,10 +24,11 @@ class UserController extends Controller
         $users = QueryBuilder::for(User::class)
             ->allowedFilters(
                 AllowedFilter::callback('search', function ($query, $value) {
-                    $query->where('nama', 'like', "%{$value}%");
+                    $query->where('name', 'like', "%{$value}%");
                     $query->orWhere('email', 'like', "%{$value}%");
                 }),
                 AllowedFilter::exact('role'),
+                AllowedFilter::exact('status'),
             )->orderBy('created_at', 'desc')
             ->paginate($limit)
             ->appends($request->query());
@@ -84,7 +83,8 @@ class UserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'editor'
+            'role' => 'editor',
+            'status' => 'active',
         ]);
 
         // Return respons json
@@ -115,6 +115,9 @@ class UserController extends Controller
             'name',
             'email',
             'role',
+            'status',
+            'profile_photo',
+            'last_login_at',
             'created_at',
             'updated_at',
         ])->find($id);
@@ -144,11 +147,19 @@ class UserController extends Controller
             ], 404);
         }
 
+        if ($user->role === 'admin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Admin user cannot be modified.',
+            ], 403);
+        }
+
         // Validator
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|' . Rule::unique('users', 'email')->ignore($user->id),
             'password' => 'nullable|string|min:8|confirmed',
+            'status' => 'required|in:active,inactive',
         ]);
 
         // Check Validator errors
@@ -162,6 +173,7 @@ class UserController extends Controller
         $data = [
             'name' => $request->name,
             'email' => $request->email,
+            'status' => $request->status,
         ];
 
         // Password hanya diubah jika dikirim
@@ -171,6 +183,7 @@ class UserController extends Controller
 
         // Update editor
         $user->update($data);
+        $user->refresh();
 
         return response()->json([
             'success' => true,

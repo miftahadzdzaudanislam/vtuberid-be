@@ -18,6 +18,7 @@ Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/refresh', [AuthController::class, 'refresh']);
 
 // ========================= PUBLIC ROUTES ===============================
+Route::get('/vtubers/events', [VtuberController::class, 'vtuberEvents']);
 Route::get('/vtubers', [VtuberController::class, 'daftarVtuber']);
 Route::get('/vtubers/{slug}', [VtuberController::class, 'detailVtuber']);
 Route::get('/organizations', [OrganizationController::class, 'daftarOrganization']);

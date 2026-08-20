@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Vtuber;
 
 use App\Http\Controllers\Controller;
-use App\Models\Organization;
 use App\Models\Vtuber;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -77,6 +77,146 @@ class VtuberController extends Controller
                 'from' => $vtubers->firstItem(),
                 'to' => $vtubers->lastItem()
             ]
+        ], 200);
+    }
+
+    /**
+     * Get Vtuber Events
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function vtuberEvents(Request $request)
+    {
+        $month = (int) $request->input('month', Carbon::now()->month);
+
+        // Validasi bulan 1 - 12
+        if ($month < 1 || $month > 12) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Month must be between 1 and 12.',
+            ], 422);
+        }
+
+        $year = Carbon::now()->year;
+
+        $activeStatuses = ['active', 'inactive', 'hiatus'];
+
+        // Birthday
+        $birthday = QueryBuilder::for(Vtuber::class)
+            ->select([
+                'id',
+                'name',
+                'slug',
+                'avatar',
+                'birthday',
+                'status',
+            ])->whereNotNull('birthday')
+            ->whereIn('status', $activeStatuses)
+            ->get()
+            ->filter(function (Vtuber $vtuber) use ($month) {
+                return (int) substr($vtuber->birthday, 0, 2) === $month;
+            })->map(function (Vtuber $vtuber) use ($year) {
+                $eventDate = Carbon::createFromFormat(
+                    'Y-m-d',
+                    $year . '-' . $vtuber->birthday
+                );
+
+                return [
+                    'id' => $vtuber->id,
+                    'name' => $vtuber->name,
+                    'slug' => $vtuber->slug,
+                    'avatar' => $vtuber->avatar,
+                    'status' => $vtuber->status,
+                    'type' => 'birthday',
+                    'event_date' => $eventDate->toDateString(),
+                ];
+            })->values();
+
+        // Debut Anniv
+        $debutAnniv = QueryBuilder::for(Vtuber::class)
+            ->select([
+                'id',
+                'name',
+                'slug',
+                'avatar',
+                'debut_date',
+                'status',
+            ])->whereNotNull('debut_date')
+            ->whereIn('status', $activeStatuses)
+            ->get()
+            ->map(function (Vtuber $vtuber) use ($year) {
+                $eventDate = Carbon::parse($vtuber->debut_date)->year($year);
+
+                return [
+                    'id' => $vtuber->id,
+                    'name' => $vtuber->name,
+                    'slug' => $vtuber->slug,
+                    'avatar' => $vtuber->avatar,
+                    'status' => $vtuber->status,
+                    'type' => 'debut_anniversary',
+                    'event_date' => $eventDate->toDateString(),
+                    'anniversary_year' =>
+                    $year - $vtuber->debut_date->year,
+                ];
+            })->values();
+
+
+        // Graduation day
+        $graduationDay = QueryBuilder::for(Vtuber::class)
+            ->select([
+                'id',
+                'name',
+                'slug',
+                'avatar',
+                'graduate_date',
+                'status',
+            ])->whereNotNull('graduate_date')
+            ->whereMonth('graduate_date', $month)
+            ->get()
+            ->map(function (Vtuber $vtuber) use ($year) {
+                $eventDate = Carbon::parse($vtuber->graduate_date)->year($year);
+
+                return [
+                    'id' => $vtuber->id,
+                    'name' => $vtuber->name,
+                    'slug' => $vtuber->slug,
+                    'avatar' => $vtuber->avatar,
+                    'status' => $vtuber->status,
+                    'type' => 'graduation',
+                    'event_date' => $eventDate->toDateString(),
+                ];
+            })->values();
+
+        // Gabungkan event
+        $events = collect()
+            ->merge($birthday)
+            ->merge($debutAnniv)
+            ->merge($graduationDay)
+            ->sortBy([
+                ['event_date', 'asc'],
+                ['name', 'asc']
+            ])
+            ->values();
+
+        // Group berdasarkan tanggal
+        $eventsByDate = $events
+            ->groupBy('event_date')
+            ->map(function ($items, $date) {
+                return [
+                    'date' => $date,
+                    'events' => $items->values(),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Get vtuber events',
+            'data' => [
+                'year' => $year,
+                'month' => $month,
+                'events' => $eventsByDate,
+            ],
         ], 200);
     }
 
@@ -199,6 +339,7 @@ class VtuberController extends Controller
             'gender' => 'required|in:male,female',
             'debut_date' => 'nullable|date',
             'birthday' => 'nullable|date_format:m-d',
+            'graduate_date' => 'nullable|date',
             'height' => 'nullable|integer|min:1|max:300',
             'status' => 'required|in:active,inactive,hiatus,graduated,retired,unknown',
             'avatar' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
@@ -261,6 +402,7 @@ class VtuberController extends Controller
             'gender' => $request->gender,
             'debut_date' => $request->debut_date,
             'birthday' => $request->birthday,
+            'graduate_date' => $request->graduate_date,
             'height' => $request->height,
             'status' => $request->status,
             'current_affiliation' => 'independent',
@@ -354,6 +496,7 @@ class VtuberController extends Controller
             'gender' => 'required|in:male,female',
             'debut_date' => 'nullable|date',
             'birthday' => 'nullable|date_format:m-d',
+            'graduate_date' => 'nullable|date',
             'height' => 'nullable|integer|min:1|max:300',
             'status' => 'required|in:active,inactive,hiatus,graduated,retired,unknown',
             'avatar' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
@@ -388,6 +531,7 @@ class VtuberController extends Controller
             'gender' => $request->gender,
             'debut_date' => $request->debut_date,
             'birthday' => $request->birthday,
+            'graduate_date' => $request->graduate_date,
             'height' => $request->height,
             'status' => $request->status,
         ];
@@ -429,6 +573,15 @@ class VtuberController extends Controller
             $vtuber->tags()->syncWithoutDetaching($tagIds);
         }
 
+        $vtuber->refresh();
+
+        $vtuber->load([
+            'organizations:id,name,slug,type,logo',
+            'tags:id,name,slug',
+            'socialAccounts:id,vtuber_id,platform_id,username,url,followers',
+            'socialAccounts.platform:id,name',
+        ]);
+
         // Return respons json
         return response()->json([
             'success' => true,
@@ -466,5 +619,49 @@ class VtuberController extends Controller
             'success' => true,
             'message' => 'Vtuber deleted successfully!'
         ], 200);
+    }
+
+    /**
+     * Make Vtuber Event
+     * @param Vtuber $vtuber
+     * @param string $dateField
+     * @param string $type
+     * @param Carbon $startDate
+     * @param Carbon $endDate
+     * @param array $extra
+     * @return array{avatar: mixed, event_date: string, id: mixed, name: mixed, slug: mixed, status: mixed, type: string|null}
+     */
+    private function makeVtuberEvent(
+        Vtuber $vtuber,
+        string $dateField,
+        string $type,
+        Carbon $startDate,
+        Carbon $endDate,
+        array $extra = []
+    ): ?array {
+        if (!$vtuber->{$dateField}) {
+            return null;
+        }
+
+        $sourceDate = Carbon::parse($vtuber->{$dateField});
+
+        $eventDate = $sourceDate->copy()->year($startDate->year);
+        if ($eventDate->lt($startDate)) {
+            $eventDate->addYear();
+        }
+
+        if ($eventDate->gt($endDate)) {
+            return null;
+        }
+
+        return array_merge([
+            'id' => $vtuber->id,
+            'name' => $vtuber->name,
+            'slug' => $vtuber->slug,
+            'avatar' => $vtuber->avatar,
+            'status' => $vtuber->status,
+            'type' => $type,
+            'event_date' => $eventDate->toDateString(),
+        ], $extra);
     }
 }

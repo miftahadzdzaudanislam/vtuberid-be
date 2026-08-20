@@ -19,6 +19,7 @@ class Vtuber extends Model
         'gender',
         'debut_date',
         'birthday',
+        'graduate_date',
         'height',
         'status',
         'current_affiliation',
@@ -27,7 +28,8 @@ class Vtuber extends Model
     ];
 
     protected $casts = [
-        'debut_date' => 'date'
+        'debut_date' => 'date',
+        'graduate_date' => 'date',
     ];
 
     // Relationships
@@ -121,19 +123,24 @@ class Vtuber extends Model
     }
 
     public function syncOrganizationStatus()
-    {
-        if ($this->status === 'retired') {
+{
+    if ($this->status === 'retired') {
 
-            $this->organizations()->each(function ($organization) {
+        $this->organizations()
+            ->wherePivot('status', 'active')
+            ->each(function ($organization) {
                 $organization->pivot->status = 'left';
                 $organization->pivot->save();
             });
-        } elseif ($this->status === 'graduated') {
 
-            $this->organizations()->each(function ($organization) {
+    } elseif ($this->status === 'graduated') {
+
+        $this->organizations()
+            ->wherePivot('status', 'active')
+            ->each(function ($organization) {
                 $organization->pivot->status = 'graduated';
                 $organization->pivot->save();
             });
-        }
     }
+}
 }
