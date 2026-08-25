@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Organization;
 
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
+use App\Services\YouTubeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -19,7 +20,7 @@ class OrganizationController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function daftarOrganization(Request $request)
+    public function daftarOrganization(Request $request, YouTubeService $youtube)
     {
         $limit = $request->input('limit', 50);
 
@@ -55,10 +56,37 @@ class OrganizationController extends Controller
             ], 200);
         }
 
-        // Hilangkan pivot dari data vtuber
-        $organizations->getCollection()->each(function ($org) {
-            $org->vtubers->each->makeHidden('pivot');
-        });
+        $channelIds = $organizations
+            ->getCollection()
+            ->pluck('youtube_channel_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $channels = $youtube->getChannels($channelIds);
+        $organizations->getCollection()->transform(
+            function ($organization) use ($channels) {
+                $channel = $channels[$organization->youtube_channel_id] ?? null;
+                $youtubeAvatar = data_get(
+                    $channel,
+                    'snippet.thumbnails.high.url',
+                    data_get(
+                        $channel,
+                        'snippet.thumbnails.medium.url',
+                        data_get(
+                            $channel,
+                            'snippet.thumbnails.default.url'
+                        )
+                    )
+                );
+
+                $organization->logo = $youtubeAvatar ?? $organization->logo;
+                $organization->vtubers->each->makeHidden('pivot');
+
+                return $organization;
+            }
+        );
 
         return response()->json([
             'success' => true,
@@ -80,7 +108,7 @@ class OrganizationController extends Controller
      * @param string $slug
      * @return \Illuminate\Http\JsonResponse
      */
-    public function detailOrganization(string $slug)
+    public function detailOrganization(string $slug, YouTubeService $youtube)
     {
         $organization = Organization::with([
             'vtubers:id,name,slug,status',
@@ -93,6 +121,15 @@ class OrganizationController extends Controller
                 'success' => false,
                 'message' => 'Organization not found'
             ], 404);
+        }
+
+        if ($organization->youtube_channel_id) {
+
+            $youtubeAvatar = $youtube->getChannelAvatar(
+                $organization->youtube_channel_id
+            );
+
+            $organization->logo = $youtubeAvatar ?? $organization->logo;
         }
 
         return response()->json([

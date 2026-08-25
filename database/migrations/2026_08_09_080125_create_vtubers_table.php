@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();
+            $table->string('youtube_channel_id')->nullable();
             $table->text('description')->nullable();
             $table->enum('gender', ['male', 'female']);
             $table->date('debut_date')->nullable();

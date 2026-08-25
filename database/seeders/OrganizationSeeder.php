@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Organization;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -18,32 +19,48 @@ class OrganizationSeeder extends Seeder
     {
         $faker = Faker::create('id_ID');
 
-        $types = ['agency', 'group'];
-        $statuses = ['active', 'inactive', 'liquidated'];
-        $firstName = ['Cozy', 'Live', 'Dream', 'Virtual', 'Creative'];
-        $lastName = ['Studio', 'Entertainment', 'Collective', 'Productions', 'Media'];
-        $slugs = [];
+        // Livium, re:memories, echianaselia
 
-        for ($i=0; $i < 3; $i++) { 
-            $name = $faker->randomElement($firstName).' '.$faker->randomElement($lastName);
-            $slug = Str::slug($name);
-
-            if (in_array($slug, $slugs)) {
-                $slug .= '-'.Str::random(4);
-            }
-            $slugs[] = $slug;
-
-            DB::table('organizations')->insert([
-                'name' => $name,
-                'slug' => $slug,
-                'type' => $faker->randomElement($types),
+        $orgs = [
+            [
+                'name' => 'Project Livium',
+                'type' => 'agency',
                 'description' => $faker->realText(150),
-                'logo' => 'organizations/'. $slug. '.png',
                 'website' => $faker->url(),
-                'status' => $faker->randomElement($statuses),
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ]);
-        }
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Re:memories',
+                'type' => 'agency',
+                'description' => $faker->realText(150),
+                'website' => $faker->url(),
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Echianaselia',
+                'type' => 'group',
+                'description' => $faker->realText(150),
+                'website' => $faker->url(),
+                'status' => 'active',
+            ],
+            [
+                'name' => 'EOS',
+                'type' => 'group',
+                'description' => $faker->realText(150),
+                'website' => $faker->url(),
+                'status' => 'liquidated',
+            ],
+        ];
+
+        foreach ($orgs as $org) {
+            $slug = Str::slug($org['name']);
+
+            $org['slug'] = $slug;
+            $org['logo'] = 'organizations/logos/' . $slug . '.png';
+            $org['created_at'] = Carbon::now();
+            $org['updated_at'] = Carbon::now();
+
+            Organization::create($org);
+        };
     }
 }

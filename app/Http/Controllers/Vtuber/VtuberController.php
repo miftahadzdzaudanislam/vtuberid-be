@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Vtuber;
 
 use App\Http\Controllers\Controller;
 use App\Models\Vtuber;
+use App\Services\YouTubeService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -20,7 +22,7 @@ class VtuberController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function daftarVtuber(Request $request)
+    public function daftarVtuber(Request $request, YouTubeService $youtube)
     {
         $limit = $request->input('limit', 50);
 
@@ -29,6 +31,7 @@ class VtuberController extends Controller
                 'id',
                 'name',
                 'slug',
+                'youtube_channel_id',
                 'avatar',
                 'status',
                 'current_affiliation'
@@ -60,9 +63,37 @@ class VtuberController extends Controller
             ], 200);
         }
 
-        // Hilangkan pivot dari data organisasi
-        $vtubers->getCollection()->each(function ($vtuber) {
+        // Ambil avatar YouTube secara batch
+        $channelIds = $vtubers
+            ->getCollection()
+            ->pluck('youtube_channel_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $channels = $youtube->getChannels($channelIds);
+        $vtubers->getCollection()->transform(function ($vtuber) use ($channels) {
+            $youtubeChannel = $channels[$vtuber->youtube_channel_id] ?? null;
+            $youtubeAvatar = data_get(
+                $youtubeChannel,
+                'snippet.thumbnails.high.url',
+                data_get(
+                    $youtubeChannel,
+                    'snippet.thumbnails.medium.url',
+                    data_get(
+                        $youtubeChannel,
+                        'snippet.thumbnails.default.url'
+                    )
+                )
+            );
+
+            $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
             $vtuber->organizations->each->makeHidden('pivot');
+
+            // Tidak perlu dikirim ke frontend
+            unset($vtuber['youtube_channel_id']);
+            return $vtuber;
         });
 
         return response()->json([
@@ -81,11 +112,50 @@ class VtuberController extends Controller
     }
 
     /**
-     * Get Vtuber Events
-     * @param Request $request
+     * Menampilkan detail vtuber berdasarkan slug
+     * @param string $slug
      * @return \Illuminate\Http\JsonResponse
      */
-    public function vtuberEvents(Request $request)
+    public function detailVtuber(string $slug, YouTubeService $youtube)
+    {
+        $vtuber = Vtuber::with([
+            'organizations:id,name,slug,type,logo',
+            'tags:id,name,slug',
+            'socialAccounts:id,vtuber_id,platform_id,username,url,followers',
+            'socialAccounts.platform:id,name,icon'
+        ])->where('slug', $slug)->first();
+
+        if (!$vtuber) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vtuber not found'
+            ], 404);
+        }
+
+        // Ambil avatar dari YouTube
+        if ($vtuber->youtube_channel_id) {
+
+            $youtubeAvatar = $youtube->getChannelAvatar(
+                $vtuber->youtube_channel_id
+            );
+
+            $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Get vtuber details',
+            'data' => $vtuber,
+        ], 200);
+    }
+
+    /**
+     * Get Vtuber Events
+     * @param Request $request
+     * @param YouTubeService $youtube
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function vtuberEvents(Request $request, YouTubeService $youtube)
     {
         $month = (int) $request->input('month', Carbon::now()->month);
 
@@ -107,6 +177,7 @@ class VtuberController extends Controller
                 'id',
                 'name',
                 'slug',
+                'youtube_channel_id',
                 'avatar',
                 'birthday',
                 'status',
@@ -125,6 +196,7 @@ class VtuberController extends Controller
                     'id' => $vtuber->id,
                     'name' => $vtuber->name,
                     'slug' => $vtuber->slug,
+                    'youtube_channel_id' => $vtuber->youtube_channel_id,
                     'avatar' => $vtuber->avatar,
                     'status' => $vtuber->status,
                     'type' => 'birthday',
@@ -138,6 +210,7 @@ class VtuberController extends Controller
                 'id',
                 'name',
                 'slug',
+                'youtube_channel_id',
                 'avatar',
                 'debut_date',
                 'status',
@@ -145,20 +218,27 @@ class VtuberController extends Controller
             ->whereIn('status', $activeStatuses)
             ->get()
             ->map(function (Vtuber $vtuber) use ($year) {
-                $eventDate = Carbon::parse($vtuber->debut_date)->year($year);
+                $debutDate = Carbon::parse($vtuber->debut_date);
+                $eventDate = $debutDate->copy()->year($year);
 
                 return [
                     'id' => $vtuber->id,
                     'name' => $vtuber->name,
                     'slug' => $vtuber->slug,
+                    'youtube_channel_id' => $vtuber->youtube_channel_id,
                     'avatar' => $vtuber->avatar,
                     'status' => $vtuber->status,
                     'type' => 'debut_anniversary',
                     'event_date' => $eventDate->toDateString(),
                     'anniversary_year' =>
-                    $year - $vtuber->debut_date->year,
+                    $year - $debutDate->year,
                 ];
-            })->values();
+            })->filter(function ($event) use ($month) {
+                return Carbon::parse(
+                    $event['event_date']
+                )->month === $month;
+            })
+            ->values();
 
 
         // Graduation day
@@ -167,6 +247,7 @@ class VtuberController extends Controller
                 'id',
                 'name',
                 'slug',
+                'youtube_channel_id',
                 'avatar',
                 'graduate_date',
                 'status',
@@ -174,12 +255,13 @@ class VtuberController extends Controller
             ->whereMonth('graduate_date', $month)
             ->get()
             ->map(function (Vtuber $vtuber) use ($year) {
-                $eventDate = Carbon::parse($vtuber->graduate_date)->year($year);
+                $eventDate = Carbon::parse($vtuber->graduate_date)->copy()->year($year);
 
                 return [
                     'id' => $vtuber->id,
                     'name' => $vtuber->name,
                     'slug' => $vtuber->slug,
+                    'youtube_channel_id' => $vtuber->youtube_channel_id,
                     'avatar' => $vtuber->avatar,
                     'status' => $vtuber->status,
                     'type' => 'graduation',
@@ -197,6 +279,36 @@ class VtuberController extends Controller
                 ['name', 'asc']
             ])
             ->values();
+
+        $channelIds = $events
+            ->pluck('youtube_channel_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $channels = $youtube->getChannels($channelIds);
+        $events = $events->map(function ($event) use ($channels) {
+            $channel = $channels[$event['youtube_channel_id'] ?? ''] ?? null;
+            $youtubeAvatar = data_get(
+                $channel,
+                'snippet.thumbnails.high.url',
+                data_get(
+                    $channel,
+                    'snippet.thumbnails.medium.url',
+                    data_get(
+                        $channel,
+                        'snippet.thumbnails.default.url'
+                    )
+                )
+            );
+
+            $event['avatar'] = $youtubeAvatar ?? $event['avatar'];
+
+            // Tidak perlu dikirim ke frontend
+            unset($event['youtube_channel_id']);
+            return $event;
+        });
 
         // Group berdasarkan tanggal
         $eventsByDate = $events
@@ -221,39 +333,11 @@ class VtuberController extends Controller
     }
 
     /**
-     * Menampilkan detail vtuber berdasarkan slug
-     * @param string $slug
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function detailVtuber(string $slug)
-    {
-        $vtuber = Vtuber::with([
-            'organizations:id,name,slug,type,logo',
-            'tags:id,name,slug',
-            'socialAccounts:id,vtuber_id,platform_id,username,url,followers',
-            'socialAccounts.platform:id,name,icon'
-        ])->where('slug', $slug)->first();
-
-        if (!$vtuber) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Vtuber not found'
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Get vtuber details',
-            'data' => $vtuber,
-        ], 200);
-    }
-
-    /**
      * Menampilkan data vtuber untuk admin
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function index(Request $request)
+    public function index(Request $request, YouTubeService $youtube)
     {
         $limit = $request->input('limit', 50);
 
@@ -262,6 +346,7 @@ class VtuberController extends Controller
                 'id',
                 'name',
                 'slug',
+                'youtube_channel_id',
                 'description',
                 'avatar',
                 'gender',
@@ -303,6 +388,37 @@ class VtuberController extends Controller
                 'message' => 'No Vtubers data found!'
             ], 200);
         }
+
+        $channelIds = $vtubers
+            ->getCollection()
+            ->pluck('youtube_channel_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $channels = $youtube->getChannels($channelIds);
+        $vtubers->getCollection()->transform(function ($vtuber) use ($channels) {
+            $channel = $channels[$vtuber->youtube_channel_id] ?? null;
+            $youtubeAvatar = data_get(
+                $channel,
+                'snippet.thumbnails.high.url',
+                data_get(
+                    $channel,
+                    'snippet.thumbnails.medium.url',
+                    data_get(
+                        $channel,
+                        'snippet.thumbnails.default.url'
+                    )
+                )
+            );
+
+            $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
+
+            // Tidak perlu dikirim ke frontend
+            unset($vtuber['youtube_channel_id']);
+            return $vtuber;
+        });
 
         return response()->json([
             'success' => true,
@@ -619,49 +735,5 @@ class VtuberController extends Controller
             'success' => true,
             'message' => 'Vtuber deleted successfully!'
         ], 200);
-    }
-
-    /**
-     * Make Vtuber Event
-     * @param Vtuber $vtuber
-     * @param string $dateField
-     * @param string $type
-     * @param Carbon $startDate
-     * @param Carbon $endDate
-     * @param array $extra
-     * @return array{avatar: mixed, event_date: string, id: mixed, name: mixed, slug: mixed, status: mixed, type: string|null}
-     */
-    private function makeVtuberEvent(
-        Vtuber $vtuber,
-        string $dateField,
-        string $type,
-        Carbon $startDate,
-        Carbon $endDate,
-        array $extra = []
-    ): ?array {
-        if (!$vtuber->{$dateField}) {
-            return null;
-        }
-
-        $sourceDate = Carbon::parse($vtuber->{$dateField});
-
-        $eventDate = $sourceDate->copy()->year($startDate->year);
-        if ($eventDate->lt($startDate)) {
-            $eventDate->addYear();
-        }
-
-        if ($eventDate->gt($endDate)) {
-            return null;
-        }
-
-        return array_merge([
-            'id' => $vtuber->id,
-            'name' => $vtuber->name,
-            'slug' => $vtuber->slug,
-            'avatar' => $vtuber->avatar,
-            'status' => $vtuber->status,
-            'type' => $type,
-            'event_date' => $eventDate->toDateString(),
-        ], $extra);
     }
 }

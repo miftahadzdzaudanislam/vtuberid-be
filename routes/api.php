@@ -10,6 +10,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\Vtuber\VtuberController;
 use App\Http\Controllers\Vtuber\VtuberOrganizationController;
 use App\Http\Controllers\Vtuber\VtuberSocialAccountController;
+use App\Http\Controllers\YouTubeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -20,7 +21,10 @@ Route::post('/refresh', [AuthController::class, 'refresh']);
 // ========================= PUBLIC ROUTES ===============================
 Route::get('/vtubers/events', [VtuberController::class, 'vtuberEvents']);
 Route::get('/vtubers', [VtuberController::class, 'daftarVtuber']);
+Route::get('/vtubers/live', [YouTubeController::class, 'liveVtubers']);
+Route::get('/vtubers/{slug}/youtube-live', [YouTubeController::class, 'live']);
 Route::get('/vtubers/{slug}', [VtuberController::class, 'detailVtuber']);
+
 Route::get('/organizations', [OrganizationController::class, 'daftarOrganization']);
 Route::get('/organizations/{slug}', [OrganizationController::class, 'detailOrganization']);
 Route::apiResource('/tags', TagController::class)->only('index');
