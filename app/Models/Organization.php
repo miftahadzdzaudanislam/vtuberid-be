@@ -15,7 +15,7 @@ class Organization extends Model
     protected $fillable = [
         'name',
         'slug',
-        'youtube_channel_id',
+        'yt_username',
         'type',
         'description',
         'logo',

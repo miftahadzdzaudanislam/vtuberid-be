@@ -21,7 +21,7 @@ class VtuberSeeder extends Seeder
         $vtubers = [
             [
                 'name' => 'Kanna Tamachi',
-                'youtube_channel_id' => '',
+                'yt_username' => '@kanna.tamachi',
                 'description' => 'Deskripsi Kanna Tamachi',
                 'gender' => 'female',
                 'status' => 'inactive',
@@ -29,7 +29,7 @@ class VtuberSeeder extends Seeder
             ],
             [
                 'name' => 'Mythia Batford',
-                'youtube_channel_id' => '',
+                'yt_username' => 'mythiabatfordch',
                 'description' => 'Deskripsi Mythia Batford',
                 'birthday' => '2005-08-28',
                 'gender' => 'female',
@@ -46,7 +46,7 @@ class VtuberSeeder extends Seeder
             // ],
             [
                 'name' => 'Noemi Hestia',
-                'youtube_channel_id' => 'UCrTUCjThDwIqtczcW0krn-Q',
+                'yt_username' => '@DeltorielVT',
                 'description' => 'Deskripsi Noemi Hestia',
                 'gender' => 'female',
                 'status' => 'active',
@@ -54,7 +54,7 @@ class VtuberSeeder extends Seeder
             ],
             [
                 'name' => 'Souta Izumi',
-                'youtube_channel_id' => '',
+                'yt_username' => 'xSoutaa',
                 'description' => 'Deskripsi Souta Izumi',
                 'gender' => 'male',
                 'graduate_date' => '2025-01-01',
@@ -63,7 +63,7 @@ class VtuberSeeder extends Seeder
             ],
             [
                 'name' => 'Elaine Celestia',
-                'youtube_channel_id' => '',
+                'yt_username' => '@ElaineCelestia',
                 'description' => 'Deskripsi Elaine Celestia',
                 'gender' => 'female',
                 'status' => 'active',
@@ -71,7 +71,7 @@ class VtuberSeeder extends Seeder
             ],
             [
                 'name' => 'Cecilia Liberia',
-                'youtube_channel_id' => '',
+                'yt_username' => 'CeciliaLieberia',
                 'description' => 'Deskripsi Cecilia Liberia',
                 'gender' => 'female',
                 'status' => 'active',
@@ -79,7 +79,7 @@ class VtuberSeeder extends Seeder
             ],
             [
                 'name' => 'Leo Axorus',
-                'youtube_channel_id' => '',
+                'yt_username' => '@LeoAxenos',
                 'description' => 'Deskripsi Leo Axorus',
                 'gender' => 'male',
                 'status' => 'graduated',
@@ -87,7 +87,7 @@ class VtuberSeeder extends Seeder
             ],
             [
                 'name' => 'Silvia Valleria',
-                'youtube_channel_id' => '',
+                'yt_username' => '@SilviaValleria',
                 'description' => 'Deskripsi Silvia Valleria',
                 'gender' => 'female',
                 'status' => 'active',
@@ -95,7 +95,7 @@ class VtuberSeeder extends Seeder
             ],
             [
                 'name' => 'Indira Naylarissa',
-                'youtube_channel_id' => '',
+                'yt_username' => 'IndiraNaylarissa',
                 'description' => 'Deskripsi Indira Naylarissa',
                 'gender' => 'female',
                 'status' => 'active',
@@ -103,7 +103,7 @@ class VtuberSeeder extends Seeder
             ],
             [
                 'name' => 'Dina Monstatera',
-                'youtube_channel_id' => '',
+                'yt_username' => '@DinaMostarterra',
                 'description' => 'Deskripsi Dina Monstatera',
                 'gender' => 'female',
                 'status' => 'graduated',

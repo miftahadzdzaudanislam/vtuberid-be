@@ -31,7 +31,7 @@ class VtuberController extends Controller
                 'id',
                 'name',
                 'slug',
-                'youtube_channel_id',
+                'yt_username',
                 'avatar',
                 'status',
                 'current_affiliation'
@@ -63,36 +63,17 @@ class VtuberController extends Controller
             ], 200);
         }
 
-        // Ambil avatar YouTube secara batch
-        $channelIds = $vtubers
-            ->getCollection()
-            ->pluck('youtube_channel_id')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        // Ambil avatar dari YouTube
+        $vtubers->getCollection()->transform(function ($vtuber) use ($youtube) {
+            if ($vtuber->yt_username) {
+                $youtubeAvatar = $youtube->getAvatarByUsername($vtuber->yt_username);
 
-        $channels = $youtube->getChannels($channelIds);
-        $vtubers->getCollection()->transform(function ($vtuber) use ($channels) {
-            $youtubeChannel = $channels[$vtuber->youtube_channel_id] ?? null;
-            $youtubeAvatar = data_get(
-                $youtubeChannel,
-                'snippet.thumbnails.high.url',
-                data_get(
-                    $youtubeChannel,
-                    'snippet.thumbnails.medium.url',
-                    data_get(
-                        $youtubeChannel,
-                        'snippet.thumbnails.default.url'
-                    )
-                )
-            );
+                // Gunakan avatar database jika YouTube tidak ditemukan 
+                $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
+            }
 
-            $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
             $vtuber->organizations->each->makeHidden('pivot');
 
-            // Tidak perlu dikirim ke frontend
-            unset($vtuber['youtube_channel_id']);
             return $vtuber;
         });
 
@@ -133,10 +114,9 @@ class VtuberController extends Controller
         }
 
         // Ambil avatar dari YouTube
-        if ($vtuber->youtube_channel_id) {
-
-            $youtubeAvatar = $youtube->getChannelAvatar(
-                $vtuber->youtube_channel_id
+        if ($vtuber->yt_username) {
+            $youtubeAvatar = $youtube->getAvatarByUsername(
+                $vtuber->yt_username
             );
 
             $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
@@ -177,7 +157,7 @@ class VtuberController extends Controller
                 'id',
                 'name',
                 'slug',
-                'youtube_channel_id',
+                'yt_username',
                 'avatar',
                 'birthday',
                 'status',
@@ -196,7 +176,7 @@ class VtuberController extends Controller
                     'id' => $vtuber->id,
                     'name' => $vtuber->name,
                     'slug' => $vtuber->slug,
-                    'youtube_channel_id' => $vtuber->youtube_channel_id,
+                    'yt_username' => $vtuber->yt_username,
                     'avatar' => $vtuber->avatar,
                     'status' => $vtuber->status,
                     'type' => 'birthday',
@@ -210,7 +190,7 @@ class VtuberController extends Controller
                 'id',
                 'name',
                 'slug',
-                'youtube_channel_id',
+                'yt_username',
                 'avatar',
                 'debut_date',
                 'status',
@@ -225,7 +205,7 @@ class VtuberController extends Controller
                     'id' => $vtuber->id,
                     'name' => $vtuber->name,
                     'slug' => $vtuber->slug,
-                    'youtube_channel_id' => $vtuber->youtube_channel_id,
+                    'yt_username' => $vtuber->yt_username,
                     'avatar' => $vtuber->avatar,
                     'status' => $vtuber->status,
                     'type' => 'debut_anniversary',
@@ -247,7 +227,7 @@ class VtuberController extends Controller
                 'id',
                 'name',
                 'slug',
-                'youtube_channel_id',
+                'yt_username',
                 'avatar',
                 'graduate_date',
                 'status',
@@ -261,7 +241,7 @@ class VtuberController extends Controller
                     'id' => $vtuber->id,
                     'name' => $vtuber->name,
                     'slug' => $vtuber->slug,
-                    'youtube_channel_id' => $vtuber->youtube_channel_id,
+                    'yt_username' => $vtuber->yt_username,
                     'avatar' => $vtuber->avatar,
                     'status' => $vtuber->status,
                     'type' => 'graduation',
@@ -280,33 +260,14 @@ class VtuberController extends Controller
             ])
             ->values();
 
-        $channelIds = $events
-            ->pluck('youtube_channel_id')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        $events = $events->map(function ($event) use ($youtube) {
+            if ($event['yt_username']) {
+                $youtubeAvatar = $youtube->getAvatarByUsername($event['yt_username']);
 
-        $channels = $youtube->getChannels($channelIds);
-        $events = $events->map(function ($event) use ($channels) {
-            $channel = $channels[$event['youtube_channel_id'] ?? ''] ?? null;
-            $youtubeAvatar = data_get(
-                $channel,
-                'snippet.thumbnails.high.url',
-                data_get(
-                    $channel,
-                    'snippet.thumbnails.medium.url',
-                    data_get(
-                        $channel,
-                        'snippet.thumbnails.default.url'
-                    )
-                )
-            );
+                // Gunakan avatar database sebagai fallback 
+                $event['avatar'] = $youtubeAvatar ?? $event['avatar'];
+            }
 
-            $event['avatar'] = $youtubeAvatar ?? $event['avatar'];
-
-            // Tidak perlu dikirim ke frontend
-            unset($event['youtube_channel_id']);
             return $event;
         });
 
@@ -346,7 +307,7 @@ class VtuberController extends Controller
                 'id',
                 'name',
                 'slug',
-                'youtube_channel_id',
+                'yt_username',
                 'description',
                 'avatar',
                 'gender',
@@ -389,34 +350,16 @@ class VtuberController extends Controller
             ], 200);
         }
 
-        $channelIds = $vtubers
-            ->getCollection()
-            ->pluck('youtube_channel_id')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        $vtubers->getCollection()->transform(function ($vtuber) use ($youtube) {
+            if ($vtuber->yt_username) {
+                $youtubeAvatar = $youtube->getAvatarByUsername($vtuber->yt_username);
 
-        $channels = $youtube->getChannels($channelIds);
-        $vtubers->getCollection()->transform(function ($vtuber) use ($channels) {
-            $channel = $channels[$vtuber->youtube_channel_id] ?? null;
-            $youtubeAvatar = data_get(
-                $channel,
-                'snippet.thumbnails.high.url',
-                data_get(
-                    $channel,
-                    'snippet.thumbnails.medium.url',
-                    data_get(
-                        $channel,
-                        'snippet.thumbnails.default.url'
-                    )
-                )
-            );
+                // YouTube sebagai avatar utama, database sebagai fallback 
+                $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
+            }
 
-            $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
-
-            // Tidak perlu dikirim ke frontend
-            unset($vtuber['youtube_channel_id']);
+            // Jangan kirim pivot ke frontend 
+            $vtuber->organizations->each->makeHidden('pivot');
             return $vtuber;
         });
 
@@ -451,6 +394,7 @@ class VtuberController extends Controller
         ]), [
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:vtubers,slug',
+            'yt_username' => 'nullable|string|max:255|unique:vtubers,yt_username',
             'description' => 'nullable|string',
             'gender' => 'required|in:male,female',
             'debut_date' => 'nullable|date',

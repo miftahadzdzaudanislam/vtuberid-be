@@ -15,7 +15,7 @@ class Vtuber extends Model
     protected $fillable = [
         'name',
         'slug',
-        'youtube_channel_id',
+        'yt_username',
         'description',
         'gender',
         'debut_date',

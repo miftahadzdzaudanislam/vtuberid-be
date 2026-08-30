@@ -24,6 +24,7 @@ class OrganizationSeeder extends Seeder
         $orgs = [
             [
                 'name' => 'Project Livium',
+                'yt_username' => 'ProjectLIVIUM',
                 'type' => 'agency',
                 'description' => $faker->realText(150),
                 'website' => $faker->url(),
@@ -31,6 +32,7 @@ class OrganizationSeeder extends Seeder
             ],
             [
                 'name' => 'Re:memories',
+                'yt_username' => '@rememoriesid',
                 'type' => 'agency',
                 'description' => $faker->realText(150),
                 'website' => $faker->url(),
@@ -45,6 +47,7 @@ class OrganizationSeeder extends Seeder
             ],
             [
                 'name' => 'EOS',
+                'yt_username' => '@EonOfStars',
                 'type' => 'group',
                 'description' => $faker->realText(150),
                 'website' => $faker->url(),

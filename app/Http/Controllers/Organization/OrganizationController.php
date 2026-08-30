@@ -28,6 +28,7 @@ class OrganizationController extends Controller
             ->select([
                 'id',
                 'name',
+                'yt_username',
                 'slug',
                 'logo',
             ])
@@ -39,7 +40,7 @@ class OrganizationController extends Controller
                 AllowedFilter::exact('status'),
                 AllowedFilter::exact('type'),
             )->with([
-                'vtubers:id,avatar'
+                'vtubers:id,avatar,yt_username'
             ])->withCount([
                 'vtubers as talent_count' => function ($query) {
                     $query->where('organization_members.status', 'active');
@@ -56,32 +57,28 @@ class OrganizationController extends Controller
             ], 200);
         }
 
-        $channelIds = $organizations
-            ->getCollection()
-            ->pluck('youtube_channel_id')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        $channels = $youtube->getChannels($channelIds);
         $organizations->getCollection()->transform(
-            function ($organization) use ($channels) {
-                $channel = $channels[$organization->youtube_channel_id] ?? null;
-                $youtubeAvatar = data_get(
-                    $channel,
-                    'snippet.thumbnails.high.url',
-                    data_get(
-                        $channel,
-                        'snippet.thumbnails.medium.url',
-                        data_get(
-                            $channel,
-                            'snippet.thumbnails.default.url'
-                        )
-                    )
-                );
+            function ($organization) use ($youtube) {
+                if ($organization->yt_username) {
+                    $youtubeLogo = $youtube->getAvatarByUsername($organization->yt_username);
 
-                $organization->logo = $youtubeAvatar ?? $organization->logo;
+                    // YouTube sebagai logo utama, database sebagai fallback 
+                    $organization->logo = $youtubeLogo ?? $organization->logo;
+                }
+
+                $organization->vtubers->transform(function ($vtuber) use ($youtube) {
+                    if ($vtuber->yt_username) {
+                        $youtubeAvatar = $youtube->getAvatarByUsername($vtuber->yt_username);
+
+                        // YouTube sebagai avatar utama // Database sebagai fallback 
+                        $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
+                    }
+
+                    unset($vtuber['yt_username']);
+                    return $vtuber;
+                });
+
+                unset($organization['yt_username']);
                 $organization->vtubers->each->makeHidden('pivot');
 
                 return $organization;
@@ -111,7 +108,7 @@ class OrganizationController extends Controller
     public function detailOrganization(string $slug, YouTubeService $youtube)
     {
         $organization = Organization::with([
-            'vtubers:id,name,slug,status',
+            'vtubers:id,name,slug,yt_username,status,avatar',
             'orgSocialAccounts:id,organization_id,platform_id,username,url',
             'orgSocialAccounts.platform:id,name,icon',
         ])->withCount('vtubers as talent_count')->where('slug', $slug)->first();
@@ -123,14 +120,23 @@ class OrganizationController extends Controller
             ], 404);
         }
 
-        if ($organization->youtube_channel_id) {
-
-            $youtubeAvatar = $youtube->getChannelAvatar(
-                $organization->youtube_channel_id
+        if ($organization->yt_username) {
+            $youtubeLogo = $youtube->getAvatarByUsername(
+                $organization->yt_username
             );
 
-            $organization->logo = $youtubeAvatar ?? $organization->logo;
+            $organization->logo = $youtubeLogo ?? $organization->logo;
         }
+
+        $organization->vtubers->transform(function ($vtuber) use ($youtube) {
+            if ($vtuber->yt_username) {
+                $youtubeAvatar = $youtube->getAvatarByUsername($vtuber->yt_username);
+                $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
+            }
+
+            unset($vtuber['yt_username']);
+            return $vtuber;
+        });
 
         return response()->json([
             'success' => true,

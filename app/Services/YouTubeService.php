@@ -17,53 +17,19 @@ class YouTubeService
         $this->apiKey = config('services.youtube.api_key');
     }
 
-    /**
-     * Get multiple YouTube channels
-     * @param array $channelIds
-     * @return array
-     */
-    public function getChannels(array $channelIds): array
+    public function getChannelByUsername(string $username): ?array
     {
-        $channelIds = collect($channelIds)
-            ->filter()
-            ->unique()
-            ->values();
+        $response = Http::get("{$this->baseUrl}/channels", [
+            'part' => 'snippet',
+            'forHandle' => '@' . ltrim($username, '@'),
+            'key' => $this->apiKey,
+        ]);
 
-        if ($channelIds->isEmpty()) {
-            return [];
+        if ($response->failed()) {
+            return null;
         }
 
-        $result = [];
-
-        foreach ($channelIds->chunk(50) as $chunk) {
-            $response = Http::get("{$this->baseUrl}/channels", [
-                'part' => 'snippet',
-                'id' => $chunk->implode(','),
-                'key' => $this->apiKey,
-            ]);
-
-            if ($response->failed()) {
-                continue;
-            }
-
-            foreach ($response->json('items', []) as $channel) {
-                $result[$channel['id']] = $channel;
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * Get single YouTube channel
-     * @param string $channelId
-     * @return array|null
-     */
-    public function getChannel(string $channelId): ?array
-    {
-        $channels = $this->getChannels([$channelId]);
-
-        return $channels[$channelId] ?? null;
+        return $response->json('items.0');
     }
 
     /**
@@ -78,7 +44,17 @@ class YouTubeService
             "youtube:channel:{$channelId}:avatar",
             now()->addHours(12),
             function () use ($channelId) {
-                $channel = $this->getChannel($channelId);
+                $response = Http::get("{$this->baseUrl}/channels", [
+                    'part' => 'snippet',
+                    'id' => $channelId,
+                    'key' => $this->apiKey
+                ]);
+
+                if ($response->failed()) {
+                    return null;
+                }
+
+                $channel = $response->json('items.0');
                 if (!$channel) {
                     return null;
                 }
@@ -201,5 +177,35 @@ class YouTubeService
             'started_at' => data_get($video, 'liveStreamingDetails.actualStartTime'),
             'scheduled_at' => data_get($video, 'liveStreamingDetails.scheduledStartTime'),
         ];
+    }
+
+    public function getAvatarByUsername(string $username): ?string
+    {
+        $channel = $this->getChannelByUsername($username);
+        if (!$channel) {
+            return null;
+        }
+
+        $channelId = $channel['id'] ?? null;
+        if (!$channelId) {
+            return null;
+        }
+
+        return $this->getChannelAvatar($channelId);
+    }
+
+    public function getLiveDataByUsername(string $username): ?array
+    {
+        $channel = $this->getChannelByUsername($username);
+        if (!$channel) {
+            return null;
+        }
+
+        $channelId = $channel['id'] ?? null;
+        if (!$channelId) {
+            return null;
+        }
+
+        return $this->getLiveData($channelId);
     }
 }

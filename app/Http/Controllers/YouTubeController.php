@@ -23,7 +23,7 @@ class YouTubeController extends Controller
             ], 404);
         }
 
-        if (!$vtuber->youtube_channel_id) {
+        if (!$vtuber->yt_username) {
             return response()->json([
                 'success' => false,
                 'message' => 'YouTube channel not found',
@@ -31,8 +31,8 @@ class YouTubeController extends Controller
         }
 
         // Cek apakah channel live
-        $live = $youtube->getLiveData(
-            $vtuber->youtube_channel_id
+        $live = $youtube->getLiveDataByUsername(
+            $vtuber->yt_username
         );
 
         if (!$live) {
@@ -44,7 +44,7 @@ class YouTubeController extends Controller
         }
 
         // Gunakan avatar youtube, database sebagai fallback
-        $avatar = $youtube->getChannelAvatar($vtuber->youtube_channel_id) ?? $vtuber->avatar;
+        $avatar = $youtube->getAvatarByUsername($vtuber->yt_username) ?? $vtuber->avatar;
 
         return response()->json([
             'success' => true,
@@ -69,16 +69,16 @@ class YouTubeController extends Controller
     public function liveVtubers(YouTubeService $youtube)
     {
         // Hanya ambil VTuber yang memiliki YouTube channel ID
-        $vtubers = Vtuber::whereNotNull('youtube_channel_id')
-            ->where('youtube_channel_id', '!=', '')
+        $vtubers = Vtuber::whereNotNull('yt_username')
+            ->where('yt_username', '!=', '')
             ->get();
 
         $liveVtubers = [];
 
         foreach ($vtubers as $vtuber) {
             // Cek live vtuber
-            $live = $youtube->getLiveData(
-                $vtuber->youtube_channel_id
+            $live = $youtube->getLiveDataByUsername(
+                $vtuber->yt_username
             );
 
             // lewati jika tidak live
@@ -87,7 +87,7 @@ class YouTubeController extends Controller
             }
 
             // Gunakan avatar youtube, database sebagai fallback
-            $avatar = $youtube->getChannelAvatar($vtuber->youtube_channel_id) ?? $vtuber->avatar;
+            $avatar = $youtube->getAvatarByUsername($vtuber->yt_username) ?? $vtuber->avatar;
 
             $liveVtubers[] = [
                 'id' => $vtuber->id,
