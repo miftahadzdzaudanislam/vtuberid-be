@@ -14,6 +14,13 @@ use App\Http\Controllers\YouTubeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/', function () {
+    return response()->json([
+        'message' => 'VTuber API - Powered by Laravel 13',
+        'status' => 'ok',
+    ]);
+});
+
 // ========================= AUTH ===============================
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/refresh', [AuthController::class, 'refresh']);
