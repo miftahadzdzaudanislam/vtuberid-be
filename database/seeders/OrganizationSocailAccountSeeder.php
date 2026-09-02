@@ -17,7 +17,7 @@ class OrganizationSocailAccountSeeder extends Seeder
     {
         $faker = Faker::create('id_ID');
 
-        $organizations = DB::table('organizations')->get();
+        $organizations = DB::table('organizations')->whereNot('slug', 'youtube')->get();
         $platforms = DB::table('platforms')->get();
 
         if ($organizations->isEmpty() || $platforms->isEmpty()) {

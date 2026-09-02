@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Organization;
+use App\Services\SocialAccountService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -18,6 +19,8 @@ class OrganizationSeeder extends Seeder
     public function run(): void
     {
         $faker = Faker::create('id_ID');
+
+        $socialAccountService = app(SocialAccountService::class);
 
         // Livium, re:memories, echianaselia
 
@@ -55,15 +58,19 @@ class OrganizationSeeder extends Seeder
             ],
         ];
 
-        foreach ($orgs as $org) {
-            $slug = Str::slug($org['name']);
+        foreach ($orgs as $data) {
+            $slug = Str::slug($data['name']);
 
-            $org['slug'] = $slug;
-            $org['logo'] = 'organizations/logos/' . $slug . '.png';
-            $org['created_at'] = Carbon::now();
-            $org['updated_at'] = Carbon::now();
+            $data['slug'] = $slug;
+            $data['logo'] = 'organizations/logos/' . $slug . '.png';
+            $data['created_at'] = Carbon::now();
+            $data['updated_at'] = Carbon::now();
 
-            Organization::create($org);
+            $org = Organization::create($data);
+
+            if ($org->yt_username) {
+                $socialAccountService->syncOrgYoutube($org);
+            }
         };
     }
 }

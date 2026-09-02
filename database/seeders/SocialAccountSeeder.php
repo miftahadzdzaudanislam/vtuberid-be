@@ -18,7 +18,7 @@ class SocialAccountSeeder extends Seeder
         $faker = Faker::create('id_ID');
 
         $vtubers = DB::table('vtubers')->get();
-        $platforms = DB::table('platforms')->get();
+        $platforms = DB::table('platforms')->whereNot('slug', 'youtube')->get();
 
         if ($vtubers->isEmpty() || $platforms->isEmpty()) {
             $this->command->warn('Skip SocialAccountSeeder: vtubers/platforms masih kosong.');

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Vtuber;
 
 use App\Http\Controllers\Controller;
 use App\Models\Vtuber;
+use App\Services\SocialAccountService;
 use App\Services\YouTubeService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -100,7 +101,7 @@ class VtuberController extends Controller
     public function detailVtuber(string $slug, YouTubeService $youtube)
     {
         $vtuber = Vtuber::with([
-            'organizations:id,name,slug,type,logo',
+            'organizations:id,name,slug,yt_username,type,logo',
             'tags:id,name,slug',
             'socialAccounts:id,vtuber_id,platform_id,username,url,followers',
             'socialAccounts.platform:id,name,icon'
@@ -121,6 +122,15 @@ class VtuberController extends Controller
 
             $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
         }
+
+        // Ambil logo organisasi dari YouTube
+        $vtuber->organizations->each(function ($organization) use ($youtube) {
+            if ($organization->yt_username) {
+                $youtubeLogo = $youtube->getAvatarByUsername($organization->yt_username);
+
+                $organization->logo = $youtubeLogo ?? $organization->logo;
+            }
+        });
 
         return response()->json([
             'success' => true,
@@ -149,8 +159,6 @@ class VtuberController extends Controller
 
         $year = Carbon::now()->year;
 
-        $activeStatuses = ['active', 'inactive', 'hiatus'];
-
         // Birthday
         $birthday = QueryBuilder::for(Vtuber::class)
             ->select([
@@ -162,7 +170,7 @@ class VtuberController extends Controller
                 'birthday',
                 'status',
             ])->whereNotNull('birthday')
-            ->whereIn('status', $activeStatuses)
+            ->whereNotIn('status', ['retired', 'graduated'])
             ->get()
             ->filter(function (Vtuber $vtuber) use ($month) {
                 return (int) substr($vtuber->birthday, 0, 2) === $month;
@@ -195,7 +203,7 @@ class VtuberController extends Controller
                 'debut_date',
                 'status',
             ])->whereNotNull('debut_date')
-            ->whereIn('status', $activeStatuses)
+            ->whereNotIn('status', ['retired', 'graduated'])
             ->get()
             ->map(function (Vtuber $vtuber) use ($year) {
                 $debutDate = Carbon::parse($vtuber->debut_date);
@@ -232,6 +240,7 @@ class VtuberController extends Controller
                 'graduate_date',
                 'status',
             ])->whereNotNull('graduate_date')
+            ->whereNotIn('status', ['retired', 'graduated'])
             ->whereMonth('graduate_date', $month)
             ->get()
             ->map(function (Vtuber $vtuber) use ($year) {
@@ -383,7 +392,7 @@ class VtuberController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function store(Request $request)
+    public function store(Request $request, SocialAccountService $socialAccount)
     {
         // Generate slug jika user tidak mengisi slug
         $slug = $request->filled('slug') ? $request->slug : Str::slug($request->name);
@@ -406,12 +415,6 @@ class VtuberController extends Controller
             'banner' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
 
             'tag_ids' => 'nullable|string',
-
-            'platforms' => 'nullable|array',
-            'platforms.*.platform_id' => 'required|integer|exists:platforms,id',
-            'platforms.*.username' => 'required|string|max:255',
-            'platforms.*.url' => 'required|url|max:500',
-            'platforms.*.followers' => 'required|numeric'
         ]);
 
         // Check Validator errors
@@ -424,16 +427,12 @@ class VtuberController extends Controller
 
         // Get data
         $tagIds = $request->input('tag_ids', []);
-        $platforms = $request->input('platforms', []);
 
         // Convert string to array
         if (is_string($tagIds)) {
             $tagIds = array_filter(
                 array_map('intval', explode(',', $tagIds))
             );
-        }
-        if (is_string($platforms)) {
-            $platforms = json_decode($platforms, true) ?? [];
         }
 
         $avatarPath = null;
@@ -458,6 +457,7 @@ class VtuberController extends Controller
         $vtuber = Vtuber::create([
             'name' => $request->name,
             'slug' => $slug,
+            'yt_username' => $request->yt_username,
             'description' => $request->description,
             'gender' => $request->gender,
             'debut_date' => $request->debut_date,
@@ -475,14 +475,9 @@ class VtuberController extends Controller
             $vtuber->tags()->sync($tagIds);
         }
 
-        // Insert Social Accounts
-        foreach ($platforms as $account) {
-            $vtuber->socialAccounts()->create([
-                'platform_id' => $account['platform_id'],
-                'username' => $account['username'],
-                'url' => $account['url'],
-                'followers' => $account['followers']
-            ]);
+        // Buat Social Account YouTube otomatis
+        if ($vtuber->yt_username) {
+            $socialAccount->syncVtuberYoutube($vtuber);
         }
 
         // Return respons json
@@ -502,11 +497,11 @@ class VtuberController extends Controller
      * @param string $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function show(string $id)
+    public function show(string $id, YouTubeService $youtube)
     {
         // Search Vtuber
         $vtuber = Vtuber::with([
-            'organizations:id,name,slug,type,logo',
+            'organizations:id,name,slug,yt_username,type,logo',
             'tags:id,name,slug',
             'socialAccounts:id,vtuber_id,platform_id,username,url,followers',
             'socialAccounts.platform:id,name'
@@ -518,6 +513,24 @@ class VtuberController extends Controller
                 'message' => 'Vtuber not found'
             ], 404);
         }
+
+        // Ambil avatar dari YouTube
+        if ($vtuber->yt_username) {
+            $youtubeAvatar = $youtube->getAvatarByUsername(
+                $vtuber->yt_username
+            );
+
+            $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
+        }
+
+        // Ambil logo organisasi dari YouTube
+        $vtuber->organizations->each(function ($organization) use ($youtube) {
+            if ($organization->yt_username) {
+                $youtubeLogo = $youtube->getAvatarByUsername($organization->yt_username);
+
+                $organization->logo = $youtubeLogo ?? $organization->logo;
+            }
+        });
 
         return response()->json([
             'success' => true,
@@ -532,7 +545,7 @@ class VtuberController extends Controller
      * @param string $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, string $id, SocialAccountService $socialAccount)
     {
         // Find vtuber
         $vtuber = Vtuber::find($id);
@@ -552,6 +565,7 @@ class VtuberController extends Controller
         ]), [
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|' . Rule::unique('vtubers', 'slug')->ignore($vtuber->id),
+            'yt_username' => 'nullable|string|max:255|' . Rule::unique('vtubers', 'yt_username')->ignore($vtuber->id),
             'description' => 'nullable|string',
             'gender' => 'required|in:male,female',
             'debut_date' => 'nullable|date',
@@ -583,10 +597,14 @@ class VtuberController extends Controller
             );
         }
 
+        // Simpan kondisi yt_username sebelum update
+        $oldYoutubeUsername = $vtuber->yt_username;
+
         // siapkan data yang ingin di update
         $data = [
             'name' => $request->name,
             'slug' => $slug,
+            'yt_username' => $request->filled('yt_username') ? ltrim($request->yt_username, '@') : null,
             'description' => $request->description,
             'gender' => $request->gender,
             'debut_date' => $request->debut_date,
@@ -630,7 +648,14 @@ class VtuberController extends Controller
 
         // Update Tags
         if ($request->has('tag_ids')) {
-            $vtuber->tags()->syncWithoutDetaching($tagIds);
+            $vtuber->tags()->sync($tagIds);
+        }
+
+        // Update or delete yt username
+        if ($vtuber->yt_username) {
+            $socialAccount->syncVtuberYoutube($vtuber);
+        } elseif ($oldYoutubeUsername) {
+            $socialAccount->removeVtuberYoutube($vtuber);
         }
 
         $vtuber->refresh();

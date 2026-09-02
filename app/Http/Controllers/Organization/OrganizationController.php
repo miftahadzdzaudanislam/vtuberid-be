@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Organization;
 
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
+use App\Services\SocialAccountService;
 use App\Services\YouTubeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -31,6 +32,7 @@ class OrganizationController extends Controller
                 'yt_username',
                 'slug',
                 'logo',
+                'status'
             ])
             ->allowedFilters(
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -79,6 +81,8 @@ class OrganizationController extends Controller
                 });
 
                 unset($organization['yt_username']);
+
+                // Hilangkan pivot dari data vtubers
                 $organization->vtubers->each->makeHidden('pivot');
 
                 return $organization;
@@ -150,7 +154,7 @@ class OrganizationController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function index(Request $request)
+    public function index(Request $request, YouTubeService $youtube)
     {
         $limit = $request->input('limit', 50);
 
@@ -166,7 +170,8 @@ class OrganizationController extends Controller
                 'vtubers' => function ($query) {
                     $query->select(
                         'vtubers.id',
-                        'vtubers.avatar'
+                        'vtubers.avatar',
+                        'vtubers.yt_username'
                     )
                         ->where('organization_members.status', 'active');
                 },
@@ -186,10 +191,35 @@ class OrganizationController extends Controller
             ], 200);
         }
 
-        // Hilangkan pivot dari data vtubers
-        $organizations->getCollection()->each(function ($organization) {
-            $organization->vtubers->each->makeHidden('pivot');
-        });
+        $organizations->getCollection()->transform(
+            function ($organization) use ($youtube) {
+                if ($organization->yt_username) {
+                    $youtubeLogo = $youtube->getAvatarByUsername($organization->yt_username);
+
+                    // YouTube sebagai logo utama, database sebagai fallback 
+                    $organization->logo = $youtubeLogo ?? $organization->logo;
+                }
+
+                $organization->vtubers->transform(function ($vtuber) use ($youtube) {
+                    if ($vtuber->yt_username) {
+                        $youtubeAvatar = $youtube->getAvatarByUsername($vtuber->yt_username);
+
+                        // YouTube sebagai avatar utama // Database sebagai fallback 
+                        $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
+                    }
+
+                    unset($vtuber['yt_username']);
+                    return $vtuber;
+                });
+
+                unset($organization['yt_username']);
+
+                // Hilangkan pivot dari data vtubers
+                $organization->vtubers->each->makeHidden('pivot');
+
+                return $organization;
+            }
+        );
 
         return response()->json([
             'success' => true,
@@ -211,7 +241,7 @@ class OrganizationController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function store(Request $request)
+    public function store(Request $request, SocialAccountService $socialAccount)
     {
         // Generate slug jika user tidak mengisi slug
         $slug = $request->filled('slug') ? $request->slug : Str::slug($request->name);
@@ -222,6 +252,7 @@ class OrganizationController extends Controller
         ]), [
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:organizations,slug',
+            'yt_username' => 'nullable|string|max:255|unique:vtubers,yt_username',
             'type' => 'required|in:agency,group',
             'description' => 'nullable|string',
             'logo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
@@ -237,11 +268,6 @@ class OrganizationController extends Controller
             ], 422);
         }
 
-        $platforms = $request->input('platforms', []);
-        if (is_string($platforms)) {
-            $platforms = json_decode($platforms, true) ?? [];
-        }
-
         // Upload image logo
         $logoPath = null;
         if ($request->hasFile('logo')) {
@@ -255,6 +281,7 @@ class OrganizationController extends Controller
         $org = Organization::create([
             'name' => $request->name,
             'slug' => $slug,
+            'yt_username' => $request->yt_username,
             'type' => $request->type,
             'description' => $request->description,
             'logo' => $logoPath,
@@ -262,13 +289,9 @@ class OrganizationController extends Controller
             'status' => $request->status,
         ]);
 
-        // Insert Social Accounts
-        foreach ($platforms as $account) {
-            $org->orgSocialAccounts()->create([
-                'platform_id' => $account['platform_id'],
-                'username' => $account['username'],
-                'url' => $account['url'],
-            ]);
+        // Buat Social Account YouTube otomatis
+        if ($org->yt_username) {
+            $socialAccount->syncOrgYoutube($org);
         }
 
         // dd($request->all());
@@ -278,7 +301,8 @@ class OrganizationController extends Controller
             'success' => true,
             'message' => 'Organization created successfully!',
             'data' => $org->load([
-                'orgSocialAccounts:id,organization_id,platform_id,username,url'
+                'orgSocialAccounts:id,organization_id,platform_id,username,url',
+                'orgSocialAccounts.platform:id,name,icon'
             ])
         ], 201);
     }
@@ -288,10 +312,10 @@ class OrganizationController extends Controller
      * @param string $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function show(string $id)
+    public function show(string $id, YouTubeService $youtube)
     {
         $organization = Organization::with([
-            'vtubers:id,name,slug,status',
+            'vtubers:id,name,slug,yt_username,status,avatar',
             'orgSocialAccounts:id,organization_id,platform_id,username,url',
         ])->withCount('vtubers as talent_count')->find($id);
 
@@ -301,6 +325,24 @@ class OrganizationController extends Controller
                 'message' => 'Organization not found'
             ], 404);
         }
+
+        if ($organization->yt_username) {
+            $youtubeLogo = $youtube->getAvatarByUsername(
+                $organization->yt_username
+            );
+
+            $organization->logo = $youtubeLogo ?? $organization->logo;
+        }
+
+        $organization->vtubers->transform(function ($vtuber) use ($youtube) {
+            if ($vtuber->yt_username) {
+                $youtubeAvatar = $youtube->getAvatarByUsername($vtuber->yt_username);
+                $vtuber->avatar = $youtubeAvatar ?? $vtuber->avatar;
+            }
+
+            unset($vtuber['yt_username']);
+            return $vtuber;
+        });
 
         return response()->json([
             'success' => true,
@@ -315,7 +357,7 @@ class OrganizationController extends Controller
      * @param string $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, string $id, SocialAccountService $socialAccount)
     {
         // Find Organization
         $org = Organization::find($id);
@@ -335,6 +377,7 @@ class OrganizationController extends Controller
         ]), [
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|' . Rule::unique('organizations', 'slug')->ignore($org->id),
+            'yt_username' => 'nullable|string|max:255|' . Rule::unique('vtubers', 'yt_username')->ignore($org->id),
             'type' => 'required|in:agency,group',
             'description' => 'nullable|string',
             'logo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
@@ -350,10 +393,14 @@ class OrganizationController extends Controller
             ], 422);
         }
 
+        // Simpan kondisi yt_username sebelum update
+        $oldYoutubeUsername = $org->yt_username;
+
         // Siapkan data
         $data = [
             'name' => $request->name,
             'slug' => $slug,
+            'yt_username' => $request->filled('yt_username') ? ltrim($request->yt_username, '@') : null,
             'type' => $request->type,
             'description' => $request->description,
             'website' => $request->website,
@@ -387,11 +434,20 @@ class OrganizationController extends Controller
             $org->syncVtuberMembership();
         }
 
+        // Update or delete yt username
+        if ($org->yt_username) {
+            $socialAccount->syncOrgYoutube($org);
+        } elseif ($oldYoutubeUsername) {
+            $socialAccount->removeOrgYoutube($org);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Organization updated successfully!',
             'data' => $org->load([
                 'vtubers:id,name,slug,status',
+                'orgSocialAccounts:id,organization_id,platform_id,username,url',
+                'orgSocialAccounts.platform:id,name,icon'
             ]),
         ], 200);
     }

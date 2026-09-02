@@ -17,10 +17,14 @@ class YouTubeService
         $this->apiKey = config('services.youtube.api_key');
     }
 
+    /**
+     * Get Channel by Username
+     * @param string $username
+     */
     public function getChannelByUsername(string $username): ?array
     {
         $response = Http::get("{$this->baseUrl}/channels", [
-            'part' => 'snippet',
+            'part' => 'snippet,statistics',
             'forHandle' => '@' . ltrim($username, '@'),
             'key' => $this->apiKey,
         ]);
@@ -33,45 +37,54 @@ class YouTubeService
     }
 
     /**
-     * Get YouTube channel avatar
-     * @param string $channelId
-     * @return string|null
+     * Get Data Channel
+     * @param string $username
+     * @return array{avatar: mixed, "channel_id": mixed, name: mixed, "subscriber_count": mixed, "video_count": mixed, "view_count": mixed|mixed|null}
      */
-    public function getChannelAvatar(string $channelId): ?string
+    public function getChannelData(string $username): ?array
     {
         return Cache::remember(
             // simpan selama 12 jam
-            "youtube:channel:{$channelId}:avatar",
+            "youtube:channel:{$username}",
             now()->addHours(12),
-            function () use ($channelId) {
-                $response = Http::get("{$this->baseUrl}/channels", [
-                    'part' => 'snippet',
-                    'id' => $channelId,
-                    'key' => $this->apiKey
-                ]);
+            function () use ($username) {
+                $channel = $this->getChannelByUsername($username);
 
-                if ($response->failed()) {
-                    return null;
-                }
-
-                $channel = $response->json('items.0');
                 if (!$channel) {
                     return null;
                 }
 
-                return data_get(
-                    $channel,
-                    'snippet.thumbnails.high.url',
-                    data_get(
+                return [
+                    'channel_id' => data_get($channel, 'id'),
+                    'name' => data_get($channel, 'snippet.title'),
+                    'avatar' => data_get(
                         $channel,
-                        'snippet.thumbnails.medium.url',
+                        'snippet.thumbnails.high.url',
                         data_get(
                             $channel,
-                            'snippet.thumbnails.default.url'
+                            'snippet.thumbnails.medium.url',
+                            data_get($channel, 'snippet.thumbnails.default.url')
                         )
-                    )
-                );
+                    ),
+
+                    'subscriber_count' => data_get($channel, 'statistics.subscriberCount'),
+                    'video_count' => data_get($channel, 'statistics.videoCount'),
+                    'view_count' => data_get($channel, 'statistics.viewCount'),
+                ];
             }
+        );
+    }
+
+    /**
+     * Get Avatar by Username
+     * @param string $username
+     * @return string|null
+     */
+    public function getAvatarByUsername(string $username): ?string
+    {
+        return data_get(
+            $this->getChannelData($username),
+            'avatar'
         );
     }
 
@@ -179,29 +192,19 @@ class YouTubeService
         ];
     }
 
-    public function getAvatarByUsername(string $username): ?string
-    {
-        $channel = $this->getChannelByUsername($username);
-        if (!$channel) {
-            return null;
-        }
-
-        $channelId = $channel['id'] ?? null;
-        if (!$channelId) {
-            return null;
-        }
-
-        return $this->getChannelAvatar($channelId);
-    }
-
+    /**
+     * Get Live data by Username
+     * @param string $username
+     * @return array|null
+     */
     public function getLiveDataByUsername(string $username): ?array
     {
-        $channel = $this->getChannelByUsername($username);
+        $channel = $this->getChannelData($username);
         if (!$channel) {
             return null;
         }
 
-        $channelId = $channel['id'] ?? null;
+        $channelId = $channel['channel_id'] ?? null;
         if (!$channelId) {
             return null;
         }

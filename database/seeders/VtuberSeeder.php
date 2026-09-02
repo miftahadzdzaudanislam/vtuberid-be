@@ -3,9 +3,11 @@
 namespace Database\Seeders;
 
 use App\Models\Vtuber;
+use App\Services\SocialAccountService;
 use Carbon\Carbon;
 use Faker\Factory as Faker;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class VtuberSeeder extends Seeder
@@ -16,6 +18,8 @@ class VtuberSeeder extends Seeder
     public function run(): void
     {
         $faker = Faker::create('id_ID');
+
+        $socialAccountService = app(SocialAccountService::class);
 
         // Kanna, miti, naomi, echi, cecil, leo, silvia, indira, dina, souta
         $vtubers = [
@@ -46,7 +50,7 @@ class VtuberSeeder extends Seeder
             // ],
             [
                 'name' => 'Noemi Hestia',
-                'yt_username' => '@DeltorielVT',
+                'yt_username' => '@sheirara',
                 'description' => 'Deskripsi Noemi Hestia',
                 'gender' => 'female',
                 'status' => 'active',
@@ -111,19 +115,23 @@ class VtuberSeeder extends Seeder
             ],
         ];
 
-        foreach ($vtubers as $vtuber) {
-            $slug = Str::slug($vtuber['name']);
+        foreach ($vtubers as $data) {
+            $slug = Str::slug($data['name']);
 
-            $vtuber['slug'] = $slug;
-            $vtuber['debut_date'] = $faker->dateTimeBetween('-4 years', '-1 month')->format('Y-m-d');
-            $vtuber['birthday'] = $faker->dateTimeBetween('-30 years', '-18 years')->format('m-d');
-            $vtuber['height'] = $faker->numberBetween(100, 300);
-            $vtuber['avatar'] = 'vtubers/avatars/' . $slug . '.png';
-            $vtuber['banner'] = 'vtubers/banners/' . $slug . '.png';
-            $vtuber['created_at'] = Carbon::now();
-            $vtuber['updated_at'] = Carbon::now();
+            $data['slug'] = $slug;
+            $data['debut_date'] = $faker->dateTimeBetween('-4 years', '-1 month')->format('Y-m-d');
+            $data['birthday'] = $faker->dateTimeBetween('-30 years', '-18 years')->format('m-d');
+            $data['height'] = $faker->numberBetween(100, 300);
+            $data['avatar'] = 'vtubers/avatars/' . $slug . '.png';
+            $data['banner'] = 'vtubers/banners/' . $slug . '.png';
+            $data['created_at'] = Carbon::now();
+            $data['updated_at'] = Carbon::now();
 
-            Vtuber::create($vtuber);
+            $vtuber = Vtuber::create($data);
+
+            if ($vtuber->yt_username) {
+                $socialAccountService->syncVtuberYoutube($vtuber);
+            }
         }
     }
 }
